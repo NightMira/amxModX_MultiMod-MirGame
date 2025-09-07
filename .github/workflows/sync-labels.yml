@@ -28,15 +28,15 @@ jobs:
           
           # Проверяем доступ к репозиторию
           echo "🔍 Testing repository access..."
-          if gh repo view ${{ github.repository }} >/dev/null 2>&1; then
-            echo "✅ Repository access confirmed!"
-          else
-            echo "❌ Cannot access repository. Please check:"
-            echo "   - Repository exists: https://github.com/${{ github.repository }}"
-            echo "   - GITHUB_TOKEN has issues:write permissions"
-            echo "   - Repository is not private or restricted"
-            exit 1
-          fi
+          echo if gh repo view ${{ github.repository }} >/dev/null 2>&1; then
+                echo "✅ Repository access confirmed!"
+                else
+                echo "❌ Cannot access repository. Please check:"
+                echo "   - Repository exists: https://github.com/${{ github.repository }}"
+                echo "   - GITHUB_TOKEN has issues:write permissions"
+                echo "   - Repository is not private or restricted"
+                exit 1
+              fi
 
           # Основные метки
           echo "🎯 Creating core labels..."

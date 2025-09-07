@@ -1,63 +1,101 @@
-name: Auto Label Issues
+name: Auto Label Issues and PRs
 
 on:
   issues:
     types: [opened, edited]
-  workflow_dispatch:
-
-permissions:
-  issues: write
+  pull_request:
+    types: [opened, edited, synchronize]
 
 jobs:
   auto-label:
     runs-on: ubuntu-latest
     steps:
-      - name: 🔍 Analyze issue title and body
-        id: labeler
+      - name: 🏷️ Auto-label issues and PRs
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const title = context.payload.issue.title.toLowerCase();
-            const body = context.payload.issue.body.toLowerCase();
-            
-            const labels = [];
-            
-            // Determine issue type
-            if (title.includes('bug') || title.includes('error') || title.includes('compile') || title.includes('fix')) {
-              labels.push('bug');
-            } else if (title.includes('feature') || title.includes('new') || title.includes('add') || title.includes('implement')) {
-              labels.push('feature');
-            } else if (title.includes('refactor') || title.includes('optimize') || title.includes('improve')) {
-              labels.push('refactor');
-            } else if (title.includes('build') || title.includes('ci/cd') || title.includes('compile')) {
-              labels.push('build');
-            } else if (title.includes('doc') || title.includes('readme') || title.includes('wiki')) {
-              labels.push('docs');
-            } else if (title.includes('test')) {
-              labels.push('test');
-            }
-            
-            // Determine priority
-            if (title.includes('critical') || title.includes('blocker') || title.includes('urgent')) {
-              labels.push('priority-critical');
-            } else if (title.includes('high') || title.includes('important')) {
-              labels.push('priority-high');
-            } else if (title.includes('low') || title.includes('minor') || title.includes('enhancement')) {
-              labels.push('priority-low');
-            } else {
-              labels.push('priority-medium');
-            }
-            
-            return labels.join(',');
+            module.exports = async ({ github, context }) => {
+              try {
+                // Безопасное получение данных
+                const issueData = context.payload.issue;
+                const prData = context.payload.pull_request;
+                
+                if (!issueData && !prData) {
+                  console.log('❌ No issue or PR data found');
+                  return;
+                }
 
-      - name: 🏷️ Apply labels
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const labels = '${{ steps.labeler.outputs.result }}'.split(',');
-            github.rest.issues.addLabels({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              labels: labels
-            });
+                const target = issueData || prData;
+                const { title, body, number, labels = [] } = target;
+                const type = issueData ? 'issue' : 'pull_request';
+
+                if (!title) {
+                  console.log(`⚠️ No title found for ${type} #${number}`);
+                  return;
+                }
+
+                console.log(`📋 Processing ${type}: "${title}" (#${number})`);
+
+                const content = `${title} ${body || ''}`.toLowerCase();
+                const newLabels = new Set(labels.map(label => label.name));
+
+                // Определение меток
+                const rules = [
+                  { keywords: ['bug', 'ошибка', 'fix', 'исправление'], label: 'bug' },
+                  { keywords: ['feature', 'функция', 'улучшение', 'новая возможность'], label: 'enhancement' },
+                  { keywords: ['doc', 'documentation', 'документация'], label: 'documentation' },
+                  { keywords: ['urgent', 'срочно', 'critical', 'критично'], label: 'priority-high' },
+                  { keywords: ['question', 'вопрос', 'help', 'помощь'], label: 'question' },
+                  { keywords: ['refactor', 'рефакторинг'], label: 'refactor' }
+                ];
+
+                rules.forEach(rule => {
+                  if (rule.keywords.some(keyword => content.includes(keyword))) {
+                    newLabels.add(rule.label);
+                  }
+                });
+
+                // Для PR добавляем размер
+                if (prData) {
+                  const { additions, deletions } = prData;
+                  const totalChanges = additions + deletions;
+                  
+                  if (totalChanges > 150) newLabels.add('size-large');
+                  else if (totalChanges > 50) newLabels.add('size-medium');
+                  else if (totalChanges > 0) newLabels.add('size-small');
+                }
+
+                // Удаляем существующие метки размера если добавляем новую
+                if (newLabels.has('size-large') || newLabels.has('size-medium') || newLabels.has('size-small')) {
+                  newLabels.delete('size-large');
+                  newLabels.delete('size-medium'); 
+                  newLabels.delete('size-small');
+                  
+                  if (totalChanges > 150) newLabels.add('size-large');
+                  else if (totalChanges > 50) newLabels.add('size-medium');
+                  else newLabels.add('size-small');
+                }
+
+                const labelsToAdd = Array.from(newLabels);
+
+                if (labelsToAdd.length > 0) {
+                  console.log(`🏷️ Setting labels: ${labelsToAdd.join(', ')}`);
+                  
+                  await github.rest.issues.setLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: number,
+                    labels: labelsToAdd
+                  });
+                  
+                  console.log('✅ Labels updated successfully');
+                } else {
+                  console.log('ℹ️ No labels to add');
+                }
+
+              } catch (error) {
+                console.error('💥 Error in auto-label workflow:', error.message);
+                // Не проваливаем весь workflow из-за ошибки меток
+              }
+            }
