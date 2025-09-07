@@ -11,16 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      contents: write
     steps:
-      - name: 🚀 Checkout code
+      - name: 🚀 Checkout code (with PAT)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
       - name: 🏷️ Sync GitHub Labels
         uses: micnncim/action-label-syncer@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         with:
           manifest: .github/labels.yml
           prune: true
@@ -28,8 +29,5 @@ jobs:
       - name: 📊 Verify labels
         run: |
           echo "✅ Labels synchronized successfully!"
-          echo "📋 Available labels:"
-          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/labels" \
-            | jq -r '.[].name' | head -10
-          echo "..."
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}

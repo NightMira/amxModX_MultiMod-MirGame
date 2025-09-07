@@ -19,6 +19,7 @@ jobs:
       - name: 🚀 Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           fetch-depth: 0
 
       - name: 📦 Install system dependencies
