@@ -16,7 +16,12 @@ jobs:
   auto-label:
     runs-on: ubuntu-latest
     steps:
-      - name: 🏷️ Auto-label issues and PRs
+      - name: 🚀 Checkout code (with private token)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+      - name: 🏷️ Auto-label issues and PRs (using existing labels)
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -42,128 +47,130 @@ jobs:
               console.log(`📋 Processing ${type}: "${title}" (#${number})`);
 
               const content = `${title} ${body || ''}`.toLowerCase();
-              const newLabels = new Set(labels.map(label => label.name));
+              const currentLabels = new Set(labels.map(label => label.name));
 
-              // 📋 Task types
+              // 📋 Task types - используем существующие имена меток из labels.yml
               if (content.includes('bug') || content.includes('ошибка') || content.includes('error') || content.includes('fix') || content.includes('исправление') || content.includes('баг')) {
-                newLabels.add('bug');
+                currentLabels.add('bug');
               }
 
               if (content.includes('feature') || content.includes('функция') || content.includes('улучшение') || content.includes('новая возможность') || content.includes('добавить')) {
-                newLabels.add('feature');
+                currentLabels.add('feature');
               }
 
               if (content.includes('refactor') || content.includes('рефакторинг') || content.includes('оптимизация') || content.includes('переработка')) {
-                newLabels.add('refactor');
+                currentLabels.add('refactor');
               }
 
               if (content.includes('build') || content.includes('сборка') || content.includes('ci/cd') || content.includes('compile') || content.includes('компиляция')) {
-                newLabels.add('build');
+                currentLabels.add('build');
               }
 
               if (content.includes('doc') || content.includes('documentation') || content.includes('документация') || content.includes('readme') || content.includes('инструкция')) {
-                newLabels.add('docs');
+                currentLabels.add('docs');
               }
 
               if (content.includes('test') || content.includes('тест') || content.includes('testing') || content.includes('тестирование')) {
-                newLabels.add('test');
+                currentLabels.add('test');
               }
 
               // 🚨 Priorities
               if (content.includes('critical') || content.includes('критич') || content.includes('блокир') || content.includes('срочно') || content.includes('аварий')) {
-                newLabels.add('priority-critical');
+                currentLabels.add('priority-critical');
               } else if (content.includes('high') || content.includes('высок') || content.includes('важн') || content.includes('приоритет')) {
-                newLabels.add('priority-high');
+                currentLabels.add('priority-high');
               } else if (content.includes('medium') || content.includes('средн') || content.includes('обычн')) {
-                newLabels.add('priority-medium');
+                currentLabels.add('priority-medium');
               } else if (content.includes('low') || content.includes('низк') || content.includes('улучшен') || content.includes('неважн')) {
-                newLabels.add('priority-low');
+                currentLabels.add('priority-low');
               }
 
               // 🔧 Components
               if (content.includes('compiler') || content.includes('компилятор') || content.includes('amxxpc') || content.includes('amxx')) {
-                newLabels.add('component-compiler');
+                currentLabels.add('component-compiler');
               }
 
               if (content.includes('ci/cd') || content.includes('pipeline') || content.includes('github action') || content.includes('workflow') || content.includes('автоматизация')) {
-                newLabels.add('component-ci-cd');
+                currentLabels.add('component-ci-cd');
               }
 
               if (content.includes('plugin') || content.includes('плагин') || content.includes('.sma') || content.includes('.amxx') || content.includes('модуль')) {
-                newLabels.add('component-plugins');
+                currentLabels.add('component-plugins');
               }
 
               if (content.includes('doc') || content.includes('документ') || content.includes('readme') || content.includes('wiki') || content.includes('инструкция')) {
-                newLabels.add('component-docs');
+                currentLabels.add('component-docs');
               }
 
               // 🏷️ Versioning
               if (content.includes('major') || content.includes('мажор') || content.includes('x.0.0')) {
-                newLabels.add('version-major');
+                currentLabels.add('version-major');
               }
 
               if (content.includes('minor') || content.includes('минор') || content.includes('0.y.0')) {
-                newLabels.add('version-minor');
+                currentLabels.add('version-minor');
               }
 
               if (content.includes('patch') || content.includes('патч') || content.includes('0.0.z') || content.includes('hotfix') || content.includes('исправление')) {
-                newLabels.add('version-patch');
+                currentLabels.add('version-patch');
               }
 
               // 🚀 Release stages
               if (content.includes('dev') || content.includes('разработка') || content.includes('development')) {
-                newLabels.add('stage-dev');
+                currentLabels.add('stage-dev');
               }
 
               if (content.includes('alpha') || content.includes('альфа')) {
-                newLabels.add('stage-alpha');
+                currentLabels.add('stage-alpha');
               }
 
               if (content.includes('beta') || content.includes('бета')) {
-                newLabels.add('stage-beta');
+                currentLabels.add('stage-beta');
               }
 
               if (content.includes('rc') || content.includes('release candidate') || content.includes('релиз-кандидат')) {
-                newLabels.add('stage-rc');
+                currentLabels.add('stage-rc');
               }
 
               if (content.includes('release') || content.includes('релиз') || content.includes('production') || content.includes('продакшен')) {
-                newLabels.add('stage-release');
+                currentLabels.add('stage-release');
               }
 
               if (content.includes('hotfix') || content.includes('хотфикс') || content.includes('срочное исправление')) {
-                newLabels.add('stage-hotfix');
+                currentLabels.add('stage-hotfix');
               }
 
               // Для PR добавляем автоматические метки
               if (prData) {
-                newLabels.add('component-plugins');
+                currentLabels.add('component-plugins');
                 
                 const { additions, deletions } = prData;
                 const totalChanges = additions + deletions;
                 
+                // Автоматически определяем приоритет по размеру изменений
                 if (totalChanges > 500) {
-                  newLabels.add('priority-critical');
+                  currentLabels.add('priority-critical');
                 } else if (totalChanges > 200) {
-                  newLabels.add('priority-high');
+                  currentLabels.add('priority-high');
                 } else if (totalChanges > 50) {
-                  newLabels.add('priority-medium');
+                  currentLabels.add('priority-medium');
                 } else if (totalChanges > 0) {
-                  newLabels.add('priority-low');
+                  currentLabels.add('priority-low');
                 }
 
                 // Добавляем stage-dev для PR в dev ветку
                 const baseRef = prData.base.ref.toLowerCase();
                 if (baseRef === 'dev') {
-                  newLabels.add('stage-dev');
+                  currentLabels.add('stage-dev');
                 }
               }
 
-              const labelsToAdd = Array.from(newLabels);
+              const labelsToAdd = Array.from(currentLabels);
 
               if (labelsToAdd.length > 0) {
-                console.log(`🏷️ Setting labels: ${labelsToAdd.join(', ')}`);
+                console.log(`🏷️ Setting existing labels: ${labelsToAdd.join(', ')}`);
                 
+                // Используем setLabels для установки существующих меток
                 await github.rest.issues.setLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -171,11 +178,19 @@ jobs:
                   labels: labelsToAdd
                 });
                 
-                console.log('✅ Labels updated successfully');
+                console.log('✅ Existing labels assigned successfully');
               } else {
-                console.log('ℹ️ No labels to add');
+                console.log('ℹ️ No matching labels to add');
               }
 
             } catch (error) {
               console.error('💥 Error in auto-label workflow:', error.message);
+              console.log('⚠️ Make sure all labels exist in the repository first');
             }
+
+      - name: 📋 Verify labels exist
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          echo "🔍 Checking if required labels exist..."
+          gh label list
