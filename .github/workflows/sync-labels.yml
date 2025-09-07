@@ -12,31 +12,31 @@ jobs:
     permissions:
       issues: write
     steps:
+      - name: 🚀 Checkout code
+        uses: actions/checkout@v4
+
       - name: 📦 Install GitHub CLI
         run: sudo apt-get update && sudo apt-get install -y gh
 
-      - name: 🔐 Setup GitHub CLI authentication
-        run: |
-          # Настраиваем аутентификацию
-          echo "✅ GitHub CLI installed"
-          echo "🔑 Using GITHUB_TOKEN for authentication"
-
       - name: 🏷️ Create essential labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
-          echo "📋 Syncing labels for: ${{ github.repository }}"
-          echo "🔗 Repository URL: https://github.com/${{ github.repository }}"
+          echo "📋 Syncing labels for: $REPO"
+          echo "🔗 Repository URL: https://github.com/$REPO"
           
           # Проверяем доступ к репозиторию
           echo "🔍 Testing repository access..."
-          echo if gh repo view ${{ github.repository }} >/dev/null 2>&1; then
-                echo "✅ Repository access confirmed!"
-                else
-                echo "❌ Cannot access repository. Please check:"
-                echo "   - Repository exists: https://github.com/${{ github.repository }}"
-                echo "   - GITHUB_TOKEN has issues:write permissions"
-                echo "   - Repository is not private or restricted"
-                exit 1
-              fi
+          if gh repo view "$REPO" >/dev/null 2>&1; then
+            echo "✅ Repository access confirmed!"
+          else
+            echo "❌ Cannot access repository. Please check:"
+            echo "   - Repository exists: https://github.com/$REPO"
+            echo "   - GITHUB_TOKEN has issues:write permissions"
+            echo "   - Repository is not private or restricted"
+            exit 1
+          fi
 
           # Основные метки
           echo "🎯 Creating core labels..."
@@ -61,15 +61,28 @@ jobs:
           gh label create "component-plugins" --color "d4c5f9" --description "Связано с разработкой плагинов" --force
           gh label create "component-docs" --color "0075ca" --description "Связано с документацией" --force
 
+          # Версионирование
+          echo "🏷️ Creating version labels..."
+          gh label create "version-major" --color "fbca04" --description "Мажорное изменение версии (X.0.0)" --force
+          gh label create "version-minor" --color "fbca04" --description "Минорное изменение версии (0.Y.0)" --force
+          gh label create "version-patch" --color "fbca04" --description "Патч версии (0.0.Z)" --force
+
+          # Стадии релиза
+          echo "🚀 Creating release stage labels..."
+          gh label create "stage-dev" --color "5319e7" --description "Разработка в dev ветке" --force
+          gh label create "stage-alpha" --color "5319e7" --description "Альфа-тестирование" --force
+          gh label create "stage-beta" --color "5319e7" --description "Бета-тестирование" --force
+          gh label create "stage-rc" --color "5319e7" --description "Релиз-кандидат" --force
+          gh label create "stage-release" --color "5319e7" --description "Финальный релиз" --force
+          gh label create "stage-hotfix" --color "5319e7" --description "Экстренный хотфикс" --force
+
           echo "✅ All labels created successfully!"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 📊 Verify labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "📋 Current labels in repository:"
           gh label list
           echo ""
           echo "✅ Label synchronization completed!"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
