@@ -15,25 +15,25 @@
 // Semantic Versioning (SemVer)
 #define PROJECT_VERSION_MAJOR       "0"
 #define PROJECT_VERSION_MAJOR_NUM   0
-#define PROJECT_VERSION_MINOR       "0"
-#define PROJECT_VERSION_MINOR_NUM   0  
-#define PROJECT_VERSION_PATCH       "1"
-#define PROJECT_VERSION_PATCH_NUM   1
-#define PROJECT_VERSION             "0.0.1"
-#define PROJECT_VERSION_NUM         001
+#define PROJECT_VERSION_MINOR       "1"
+#define PROJECT_VERSION_MINOR_NUM   1
+#define PROJECT_VERSION_PATCH       "0"
+#define PROJECT_VERSION_PATCH_NUM   0
+#define PROJECT_VERSION             "0.1.0"
+#define PROJECT_VERSION_NUM         010
 
 // Version Suffix (Pre-release tags)
-//#define PROJECT_VERSION_TAG         "-alpha.1"
-#define PROJECT_VERSION_SUFFIX      "-alpha.1"
+#define PROJECT_VERSION_TAG         ""
+#define PROJECT_VERSION_SUFFIX      ""
 
 // Build Information
-#define PROJECT_BUILD               "9"
-#define PROJECT_BUILD_NUM           9
+#define PROJECT_BUILD               "1"
+#define PROJECT_BUILD_NUM           1
 #define PROJECT_BUILD_DATE          "2025-09-05"
 #define PROJECT_BUILD_TIME          __TIME__
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
-// Git Commit Information (will be updated by CI/CD)
+// Git Commit Information
 #define PROJECT_COMMIT_HASH         ""
 #define PROJECT_COMMIT_SHORT_HASH   ""
 #define PROJECT_COMMIT_AUTHOR       ""

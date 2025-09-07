@@ -2,7 +2,7 @@ name: Sync Labels
 
 on:
   push:
-    branches: [main, dev, pre-release/alpha/*, pre-release/beta/*, pre-release/rc/*, hotfix/*]
+    branches: [main, dev]
     paths: ['.github/labels.yml']
   workflow_dispatch:
 
@@ -12,64 +12,23 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: 📦 Install GitHub CLI
-        run: sudo apt-get update && sudo apt-get install -y gh
+      - name: 🚀 Checkout code (with private token)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
-      - name: 🔐 Setup GitHub CLI authentication
-        run: |
-          # Настраиваем аутентификацию
-          echo "✅ GitHub CLI installed"
-          echo "🔑 Using GITHUB_TOKEN for authentication"
-
-      - name: 🏷️ Create essential labels
-        run: |
-          echo "📋 Syncing labels for: ${{ github.repository }}"
-          echo "🔗 Repository URL: https://github.com/${{ github.repository }}"
-          
-          # Проверяем доступ к репозиторию
-          echo "🔍 Testing repository access..."
-          if gh repo view ${{ github.repository }} >/dev/null 2>&1; then
-            echo "✅ Repository access confirmed!"
-          else
-            echo "❌ Cannot access repository. Please check:"
-            echo "   - Repository exists: https://github.com/${{ github.repository }}"
-            echo "   - GITHUB_TOKEN has issues:write permissions"
-            echo "   - Repository is not private or restricted"
-            exit 1
-          fi
-
-          # Основные метки
-          echo "🎯 Creating core labels..."
-          gh label create "bug" --color "d73a4a" --description "Ошибки компиляции или баги в плагинах" --force
-          gh label create "feature" --color "a2eeef" --description "Новые функции плагинов" --force
-          gh label create "refactor" --color "d4c5f9" --description "Рефакторинг кода" --force
-          gh label create "build" --color "0075ca" --description "Задачи сборки и CI/CD" --force
-          gh label create "docs" --color "0075ca" --description "Документация" --force
-          gh label create "test" --color "d93f0b" --description "Тестирование" --force
-
-          # Приоритеты
-          echo "🚦 Creating priority labels..."
-          gh label create "priority-critical" --color "b60205" --description "Критический приоритет - блокирует разработку" --force
-          gh label create "priority-high" --color "d93f0b" --description "Высокий приоритет - важные функции" --force
-          gh label create "priority-medium" --color "0e8a16" --description "Средний приоритет - обычная разработка" --force
-          gh label create "priority-low" --color "ededed" --description "Низкий приоритет - улучшения" --force
-
-          # Компоненты
-          echo "🔧 Creating component labels..."
-          gh label create "component-compiler" --color "bfdadc" --description "Связано с AMXX компилятором" --force
-          gh label create "component-ci-cd" --color "bfd4f2" --description "Связано с CI/CD пайплайном" --force
-          gh label create "component-plugins" --color "d4c5f9" --description "Связано с разработкой плагинов" --force
-          gh label create "component-docs" --color "0075ca" --description "Связано с документацией" --force
-
-          echo "✅ All labels created successfully!"
+      - name: 🏷️ Sync GitHub Labels
+        uses: micnncim/action-label-syncer@v1
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        with:
+          manifest: .github/labels.yml
+          prune: true
 
       - name: 📊 Verify labels
-        run: |
-          echo "📋 Current labels in repository:"
-          gh label list
-          echo ""
-          echo "✅ Label synchronization completed!"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          echo "✅ Labels synchronized successfully!"
+          echo "📋 Available labels:"
+          gh label list --limit 10

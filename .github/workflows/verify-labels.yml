@@ -1,0 +1,37 @@
+name: Verify Labels Exist
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/labels.yml']
+
+jobs:
+  verify-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+      - name: 🏷️ Verify all labels from labels.yml exist
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          echo "🔍 Verifying labels from labels.yml..."
+          
+          # Читаем метки из labels.yml
+          labels=$(grep -E "name:" .github/labels.yml | awk -F '"' '{print $2}')
+          
+          for label in $labels; do
+            if gh label view "$label" >/dev/null 2>&1; then
+              echo "✅ Label exists: $label"
+            else
+              echo "❌ Label missing: $label"
+              echo "   Creating missing label..."
+              gh label create "$label" --color "000000" --description "Auto-created label" --force
+            fi
+          done
+          
+          echo "✅ All labels verified!"

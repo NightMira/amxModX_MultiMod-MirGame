@@ -15,24 +15,7 @@ get_define_value() {
 }
 
 uses_project_author() {
-    local sma_file="$1"
-    
-    # 1. Проверяем прямое использование PROJECT_AUTHOR в register_plugin
-    if grep -E "register_plugin\([^,]+,[^,]+,PROJECT_AUTHOR" "$sma_file" >/dev/null 2>&1; then
-        return 0
-    fi
-    
-    # 2. Проверяем включение version.inc
-    if grep -E "#include[[:space:]]+<version>" "$sma_file" >/dev/null 2>&1; then
-        return 0
-    fi
-    
-    # 3. Проверяем использование PROJECT_AUTHOR в любом контексте
-    if grep -E "PROJECT_AUTHOR" "$sma_file" >/dev/null 2>&1; then
-        return 0
-    fi
-    
-    return 1
+    grep -E "register_plugin\([^,]+,[^,]+,PROJECT_AUTHOR" "$1" >/dev/null 2>&1
 }
 
 get_plugin_status() {
@@ -77,17 +60,10 @@ compile_plugin() {
     [ -z "$plugin_name" ] && { warnings+="PLUGIN_NAME "; local_warnings=$((local_warnings + 1)); plugin_name="Not name"; }
     [ -z "$plugin_version" ] && { warnings+="PLUGIN_VERSION "; local_warnings=$((local_warnings + 1)); plugin_version=""; }
     
-    # В функции compile_plugin():
-    if [ -z "$plugin_author" ]; then
-        if uses_project_author "$sma_file"; then
-            # Плагин использует PROJECT_AUTHOR - берем из конфига
-            plugin_author="$PROJECT_AUTHOR"
-            echo "ℹ️ Using PROJECT_AUTHOR: $plugin_author" >> "$LOG_FILE"
-        else
-            # Не использует PROJECT_AUTHOR и не имеет своего автора
-            warnings+="PLUGIN_AUTHOR "; local_warnings=$((local_warnings + 1))
-            plugin_author="Not author"
-        fi
+    if [ -z "$plugin_author" ] && ! uses_project_author "$sma_file"; then
+        warnings+="PLUGIN_AUTHOR "; local_warnings=$((local_warnings + 1)); plugin_author="Not author"
+    elif [ -z "$plugin_author" ] && uses_project_author "$sma_file"; then
+        plugin_author="$PROJECT_AUTHOR"
     fi
     
     local version_display=""; [ -n "$plugin_version" ] && version_display="v$plugin_version" || version_display="Not version"

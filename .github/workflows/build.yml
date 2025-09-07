@@ -19,12 +19,13 @@ jobs:
       - name: 🚀 Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           fetch-depth: 0
 
       - name: 📦 Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libc6-i386 lib32stdc++6 lib32z1 lib32gcc-s1 wget tar jq
+          sudo apt-get install -y libc6-i386 lib32stdc++6 lib32z1 lib32gcc-s1 wget tar
 
       - name: 🔧 Download AMXX Compiler
         run: |
@@ -95,7 +96,7 @@ jobs:
       - name: 🏗️ Update version information
         run: |
           if [ -n "$VERSION_CMD" ]; then
-            echo "🔧 Executing: python3 update_version.py $VERSION_CMD"
+            echo "🔧 Executing: $VERSION_CMD"
             
             if [[ "$VERSION_CMD" == *"&&"* ]]; then
               IFS='&&' read -r cmd1 cmd2 <<< "$VERSION_CMD"
@@ -108,9 +109,6 @@ jobs:
           
           python3 update_version.py build
           
-          # Временное решение - просто логируем коммит
-          echo "📝 Commit info: $COMMIT_HASH by $COMMIT_AUTHOR"
-          
           echo "📊 Final version information:"
           python3 update_version.py info
 
@@ -120,20 +118,7 @@ jobs:
           chmod +x compile.sh
           ./compile.sh
 
-      - name: 📋 Create build info file
-        run: |
-          echo "BUILD_INFO_START"
-          echo "ARTIFACT_NAME=amxx-plugins-$ARTIFACT_SUFFIX"
-          echo "VERSION=$(python3 update_version.py get-full-version)"
-          echo "BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')"
-          echo "BRANCH=${GITHUB_REF#refs/heads/}"
-          echo "COMMIT=${{ github.sha }}"
-          echo "BUILD_INFO_END"
-          
-          # Сохраняем информацию в файл
-          python3 update_version.py info > build_info.txt
-
-      - name: 📦 Upload artifacts with official action
+      - name: 📦 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: amxx-plugins-${{ env.ARTIFACT_SUFFIX }}
@@ -141,7 +126,6 @@ jobs:
             compiled/*.amxx
             compile.log
             scripting/include/version.inc
-            build_info.txt
           retention-days: 30
 
       - name: 📋 Create build summary
@@ -151,9 +135,10 @@ jobs:
           echo "**Branch:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
           echo "**Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "**Artifact:** amxx-plugins-$ARTIFACT_SUFFIX" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifact:** amxx-plugins-${{ env.ARTIFACT_SUFFIX }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
+          echo "### 📊 Version Details" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           python3 update_version.py info >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

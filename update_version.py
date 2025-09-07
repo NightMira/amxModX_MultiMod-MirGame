@@ -182,56 +182,6 @@ def update_version_suffix(suffix_type, number=""):
         return new_suffix
     return False
 
-# Добавить в существующий код:
-
-def set_commit_info(commit_hash, author):
-    """Обновляет информацию о коммите в version.inc"""
-    info = get_current_version_info()
-    if not info:
-        return False
-    
-    short_hash = commit_hash[:7] if commit_hash else ""
-    
-    content = f"""#if defined _version_included
-    #endinput
-#endif
-#define _version_included
-
-#define PROJECT_NAME "{info['name']}"
-#define PROJECT_AUTHOR "{info['author']}"
-#define PROJECT_VERSION "{info['version']}"
-#define PROJECT_VERSION_SUFFIX "{info['suffix']}"
-#define PROJECT_BUILD "{info['build']}"
-#define PROJECT_BUILD_DATE "{datetime.datetime.now().strftime('%Y-%m-%d')}"
-
-#define PROJECT_COMMIT_HASH "{commit_hash}"
-#define PROJECT_COMMIT_SHORT_HASH "{short_hash}"
-#define PROJECT_COMMIT_AUTHOR "{author}"
-#define PROJECT_COMMIT_DATE "{datetime.datetime.now().strftime('%Y-%m-%d')}"
-
-#define PRINT_PROJECT_INFO() \\
-    server_print("[%s] Project v%s%s (build %s, %s)", \\
-    PROJECT_NAME, PROJECT_VERSION, PROJECT_VERSION_SUFFIX, PROJECT_BUILD, PROJECT_BUILD_DATE)
-
-#define PRINT_PROJECT_INFO_DETAILED() \\
-    server_print("[%s] Project Information:", PROJECT_NAME); \\
-    server_print("  Version: v%s%s", PROJECT_VERSION, PROJECT_VERSION_SUFFIX); \\
-    server_print("  Build: %s (%s)", PROJECT_BUILD, PROJECT_BUILD_DATE); \\
-    server_print("  Author: %s", PROJECT_AUTHOR); \\
-    if(strlen(PROJECT_COMMIT_SHORT_HASH) > 0) {{ \\
-        server_print("  Commit: %s", PROJECT_COMMIT_SHORT_HASH); \\
-    }}
-"""
-    
-    return update_version_file(content)
-
-def get_build():
-    """Получить номер сборки"""
-    info = get_current_version_info()
-    return info['build'] if info else "1"
-
-
-
 def handle_command(args):
     if not args or args[0] in ['-h', '--help']:
         show_help()
@@ -300,13 +250,7 @@ def handle_command(args):
         full_version = f"{info['version']}{info['suffix']}" if info else "1.0.0"
         print(full_version)
         return True
-    elif command in ['set-commit', '--set-commit']:
-        commit_hash = args[1] if len(args) > 1 else ""
-        author = args[2] if len(args) > 2 else ""
-        return set_commit_info(commit_hash, author)
-    elif command in ['get-build', '--get-build']:
-        print(get_build())
-        return True
+        
     else:
         print(f"❌ Unknown command: {command}")
         show_help()
