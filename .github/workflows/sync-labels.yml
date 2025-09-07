@@ -14,8 +14,10 @@ jobs:
     steps:
       - name: 🚀 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: 🏷️ Use label syncer action
+      - name: 🏷️ Sync GitHub Labels
         uses: micnncim/action-label-syncer@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -24,4 +26,10 @@ jobs:
           prune: true
 
       - name: 📊 Verify labels
-        run: echo "✅ Labels synchronized using action-label-syncer"
+        run: |
+          echo "✅ Labels synchronized successfully!"
+          echo "📋 Available labels:"
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/labels" \
+            | jq -r '.[].name' | head -10
+          echo "..."
