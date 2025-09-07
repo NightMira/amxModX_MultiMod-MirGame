@@ -20,7 +20,7 @@ jobs:
       - name: 📋 Add issues to project
         if: github.event_name == 'issues' && github.event.action == 'opened'
         run: |
-          gh project item-add https://github.com/orgs/MirGame-Studio/projects/2 \
+          gh project item-add https://github.com/users/NightMira/projects/3 \
             --owner ${{ github.repository_owner }} \
             --repo ${{ github.event.repository.name }} \
             --issue ${{ github.event.issue.number }}
@@ -30,7 +30,7 @@ jobs:
       - name: 🔄 Add PRs to project
         if: github.event_name == 'pull_request' && github.event.action == 'opened'
         run: |
-          gh project item-add https://github.com/orgs/MirGame-Studio/projects/2 \
+          gh project item-add https://github.com/users/NightMira/projects/3 \
             --owner ${{ github.repository_owner }} \
             --repo ${{ github.event.repository.name }} \
             --issue ${{ github.event.pull_request.number }}
