@@ -1,0 +1,44 @@
+name: Project Automation
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request:
+    types: [opened, closed]
+  workflow_dispatch:
+
+jobs:
+  automate-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install -y gh
+
+      - name: 📋 Add issues to project
+        if: github.event_name == 'issues' && github.event.action == 'opened'
+        run: |
+          gh project item-add https://github.com/orgs/MirGame-Studio/projects/2 \
+            --owner ${{ github.repository_owner }} \
+            --repo ${{ github.event.repository.name }} \
+            --issue ${{ github.event.issue.number }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔄 Add PRs to project
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        run: |
+          gh project item-add https://github.com/orgs/MirGame-Studio/projects/2 \
+            --owner ${{ github.repository_owner }} \
+            --repo ${{ github.event.repository.name }} \
+            --issue ${{ github.event.pull_request.number }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ Log closed items
+        if: (github.event_name == 'issues' || github.event_name == 'pull_request') && github.event.action == 'closed'
+        run: |
+          echo "📝 Item closed: ${{ github.event.issue.number || github.event.pull_request.number }}"
+          echo "🔧 Manual movement to Done column may be required"

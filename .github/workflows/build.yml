@@ -1,0 +1,160 @@
+name: AMXX Build System
+
+on:
+  push:
+    branches: [main, dev, pre-release/alpha/*, pre-release/beta/*, pre-release/rc/*, hotfix/*]
+  pull_request:
+    branches: [main, dev]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libc6-i386 lib32stdc++6 lib32z1 lib32gcc-s1 wget tar jq
+
+      - name: 🔧 Download AMXX Compiler
+        run: |
+          wget -q https://github.com/NightMira/amxmodx_1-9/releases/download/v1.9/amxmodx19.tar
+          tar -xf amxmodx19.tar
+          chmod +x amxxpc
+          ./amxxpc --help || true
+
+      - name: 🏷️ Determine version based on branch
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          echo "📋 Current branch: $BRANCH_NAME"
+          
+          # Получаем текущую версию
+          CURRENT_VERSION=$(python3 update_version.py get-version)
+          CURRENT_SUFFIX=$(python3 update_version.py get-suffix)
+          
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            echo "VERSION_STRATEGY=release" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=stable" >> $GITHUB_ENV
+            echo "VERSION_CMD=release" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" == "dev" ]]; then
+            echo "VERSION_STRATEGY=snapshot" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=dev" >> $GITHUB_ENV
+            if [[ "$CURRENT_SUFFIX" != *"SNAPSHOT"* ]]; then
+              echo "VERSION_CMD=snapshot" >> $GITHUB_ENV
+            else
+              echo "VERSION_CMD=" >> $GITHUB_ENV
+            fi
+            
+          elif [[ "$BRANCH_NAME" =~ ^pre-release/alpha/ ]]; then
+            ALPHA_NUM="${BRANCH_NAME##*/}"
+            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=alpha-$ALPHA_NUM" >> $GITHUB_ENV
+            echo "VERSION_CMD=alpha $ALPHA_NUM" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" =~ ^pre-release/beta/ ]]; then
+            BETA_NUM="${BRANCH_NAME##*/}"
+            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=beta-$BETA_NUM" >> $GITHUB_ENV
+            echo "VERSION_CMD=beta $BETA_NUM" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" =~ ^pre-release/rc/ ]]; then
+            RC_NUM="${BRANCH_NAME##*/}"
+            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=rc-$RC_NUM" >> $GITHUB_ENV
+            echo "VERSION_CMD=rc $RC_NUM" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" =~ ^hotfix/ ]]; then
+            HOTFIX_NUM=$(echo "$BRANCH_NAME" | grep -o '[0-9]*$' || echo "1")
+            echo "VERSION_STRATEGY=hotfix" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=hotfix-$HOTFIX_NUM" >> $GITHUB_ENV
+            echo "VERSION_CMD=patch && hotfix $HOTFIX_NUM" >> $GITHUB_ENV
+            
+          else
+            echo "VERSION_STRATEGY=keep" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=feature" >> $GITHUB_ENV
+            echo "VERSION_CMD=" >> $GITHUB_ENV
+          fi
+          
+          echo "COMMIT_HASH=${{ github.sha }}" >> $GITHUB_ENV
+          echo "COMMIT_AUTHOR=${{ github.actor }}" >> $GITHUB_ENV
+          
+          echo "🎯 Version strategy: $VERSION_STRATEGY"
+          echo "📦 Artifact suffix: $ARTIFACT_SUFFIX"
+
+      - name: 🏗️ Update version information
+        run: |
+          if [ -n "$VERSION_CMD" ]; then
+            echo "🔧 Executing: $VERSION_CMD"
+            
+            if [[ "$VERSION_CMD" == *"&&"* ]]; then
+              IFS='&&' read -r cmd1 cmd2 <<< "$VERSION_CMD"
+              python3 update_version.py $(echo $cmd1 | xargs)
+              python3 update_version.py $(echo $cmd2 | xargs)
+            else
+              python3 update_version.py $VERSION_CMD
+            fi
+          fi
+          
+          python3 update_version.py build
+          python3 update_version.py set-commit "$COMMIT_HASH" "$COMMIT_AUTHOR"
+          
+          python3 update_version.py info
+
+      - name: 🏗️ Compile all plugins
+        run: |
+          mkdir -p compiled
+          chmod +x compile.sh
+          ./compile.sh
+
+      - name: 📋 Create build info file
+        run: |
+          echo "BUILD_INFO_START"
+          echo "ARTIFACT_NAME=amxx-plugins-$ARTIFACT_SUFFIX"
+          echo "VERSION=$(python3 update_version.py get-full-version)"
+          echo "BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')"
+          echo "BRANCH=${GITHUB_REF#refs/heads/}"
+          echo "COMMIT=${{ github.sha }}"
+          echo "BUILD_INFO_END"
+          
+          # Сохраняем информацию в файл
+          python3 update_version.py info > build_info.txt
+
+      - name: 📦 Upload artifacts with official action
+        uses: actions/upload-artifact@v4
+        with:
+          name: amxx-plugins-${{ env.ARTIFACT_SUFFIX }}
+          path: |
+            compiled/*.amxx
+            compile.log
+            scripting/include/version.inc
+            build_info.txt
+          retention-days: 30
+
+      - name: 📋 Create build summary
+        run: |
+          FULL_VERSION=$(python3 update_version.py get-full-version)
+          echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifact:** amxx-plugins-$ARTIFACT_SUFFIX" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          python3 update_version.py info >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
