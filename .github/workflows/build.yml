@@ -95,7 +95,7 @@ jobs:
       - name: 🏗️ Update version information
         run: |
           if [ -n "$VERSION_CMD" ]; then
-            echo "🔧 Executing: $VERSION_CMD"
+            echo "🔧 Executing: python3 update_version.py $VERSION_CMD"
             
             if [[ "$VERSION_CMD" == *"&&"* ]]; then
               IFS='&&' read -r cmd1 cmd2 <<< "$VERSION_CMD"
@@ -107,8 +107,11 @@ jobs:
           fi
           
           python3 update_version.py build
-          python3 update_version.py set-commit "$COMMIT_HASH" "$COMMIT_AUTHOR"
           
+          # Временное решение - просто логируем коммит
+          echo "📝 Commit info: $COMMIT_HASH by $COMMIT_AUTHOR"
+          
+          echo "📊 Final version information:"
           python3 update_version.py info
 
       - name: 🏗️ Compile all plugins
