@@ -22,7 +22,6 @@ jobs:
           github-token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           script: |
             try {
-              // Безопасное получение данных
               const issueData = context.payload.issue;
               const prData = context.payload.pull_request;
               
@@ -138,13 +137,11 @@ jobs:
 
               // Для PR добавляем автоматические метки
               if (prData) {
-                // Все PR связаны с плагинами
                 newLabels.add('component-plugins');
                 
                 const { additions, deletions } = prData;
                 const totalChanges = additions + deletions;
                 
-                // Автоматически определяем приоритет по размеру изменений
                 if (totalChanges > 500) {
                   newLabels.add('priority-critical');
                 } else if (totalChanges > 200) {
@@ -155,7 +152,7 @@ jobs:
                   newLabels.add('priority-low');
                 }
 
-                // Добавляем метку stage-dev для PR в dev ветку
+                // Добавляем stage-dev для PR в dev ветку
                 const baseRef = prData.base.ref.toLowerCase();
                 if (baseRef === 'dev') {
                   newLabels.add('stage-dev');
@@ -181,5 +178,4 @@ jobs:
 
             } catch (error) {
               console.error('💥 Error in auto-label workflow:', error.message);
-              // Не проваливаем весь workflow из-за ошибки меток
             }

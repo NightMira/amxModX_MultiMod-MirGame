@@ -2,43 +2,123 @@ name: Project Automation
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened, reopened, closed]
   pull_request:
-    types: [opened, closed]
+    types: [opened, reopened, closed, ready_for_review]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
-  automate-project:
+  project-automation:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Checkout code
+      - name: 🚀 Checkout code (with private token)
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
-      - name: 📦 Install GitHub CLI
-        run: sudo apt-get update && sudo apt-get install -y gh
-
-      - name: 📋 Add issues to project
-        if: github.event_name == 'issues' && github.event.action == 'opened'
-        run: |
-          gh project item-add https://github.com/users/NightMira/projects/3 \
-            --owner ${{ github.repository_owner }} \
-            --repo ${{ github.event.repository.name }} \
-            --issue ${{ github.event.issue.number }}
+      - name: 📋 Add new items to project
+        if: github.event_name == 'issues' && github.event.action == 'opened' || github.event_name == 'pull_request' && github.event.action == 'opened'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🔄 Add PRs to project
-        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
-          gh project item-add https://github.com/users/NightMira/projects/3 \
-            --owner ${{ github.repository_owner }} \
-            --repo ${{ github.event.repository.name }} \
-            --issue ${{ github.event.pull_request.number }}
+          echo "🎯 Adding ${{ github.event_name }} to project..."
+          
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            ITEM_URL="https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/${{ github.event.issue.number }}"
+          else
+            ITEM_URL="https://github.com/NightMira/amxModX_MultiMod-MirGame/pull/${{ github.event.pull_request.number }}"
+          fi
+          
+          # Добавляем в проект организации MirGame-Studio
+          gh project item-add 2 \
+            --owner MirGame-Studio \
+            --url "$ITEM_URL"
+          
+          echo "✅ Added to project successfully!"
+
+      - name: 🏷️ Update project status
+        if: github.event.action == 'closed' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: ✅ Log closed items
-        if: (github.event_name == 'issues' || github.event_name == 'pull_request') && github.event.action == 'closed'
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
-          echo "📝 Item closed: ${{ github.event.issue.number || github.event.pull_request.number }}"
-          echo "🔧 Manual movement to Done column may be required"
+          echo "🔄 Updating project status for ${{ github.event_name }} #${{ github.event.issue.number || github.event.pull_request.number }}"
+          
+          # Получаем ID проекта
+          PROJECT_ID=$(gh api graphql -f query='
+            query {
+              organization(login: "MirGame-Studio") {
+                projectV2(number: 2) {
+                  id
+                }
+              }
+            }
+          ' | jq -r '.data.organization.projectV2.id')
+          
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            CONTENT_ID="${{ github.event.issue.node_id }}"
+          else
+            CONTENT_ID="${{ github.event.pull_request.node_id }}"
+          fi
+          
+          if [ -n "$PROJECT_ID" ] && [ -n "$CONTENT_ID" ]; then
+            # Находим ID элемента в проекте
+            ITEM_ID=$(gh api graphql -f query='
+              query {
+                node(id: "'$PROJECT_ID'") {
+                  ... on ProjectV2 {
+                    items(first: 50) {
+                      nodes {
+                        id
+                        content {
+                          ... on Issue {
+                            id
+                            number
+                          }
+                          ... on PullRequest {
+                            id
+                            number
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ' | jq -r '.data.node.items.nodes[] | select(.content.id == "'$CONTENT_ID'") | .id')
+            
+            if [ -n "$ITEM_ID" ]; then
+              # Обновляем статус
+              if [ "${{ github.event.action }}" = "closed" ]; then
+                STATUS="Done"
+              elif [ "${{ github.event.action }}" = "reopened" ] || [ "${{ github.event.action }}" = "ready_for_review" ]; then
+                STATUS="In Progress"
+              else
+                STATUS="Todo"
+              fi
+              
+              echo "📊 Setting status to: $STATUS"
+              
+              # Обновляем статус в проекте
+              gh api graphql -f query='
+                mutation {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: "'$PROJECT_ID'",
+                    itemId: "'$ITEM_ID'",
+                    fieldId: "Status",
+                    value: {
+                      singleSelectOptionId: "'$STATUS'"
+                    }
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }
+              '
+            fi
+          fi

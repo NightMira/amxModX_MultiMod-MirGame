@@ -196,11 +196,10 @@ create_example_plugin() {
 
 #define PLUGIN_NAME "Example Plugin"
 #define PLUGIN_VERSION "1.0.0"
-#define PLUGIN_AUTHOR PROJECT_AUTHOR
 
 public plugin_init()
 {
-    register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR);
+    register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PROJECT_AUTHOR);
     
     // Show project info in server console
     PRINT_PROJECT_INFO();
