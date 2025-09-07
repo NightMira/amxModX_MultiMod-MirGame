@@ -30,13 +30,16 @@ jobs:
           
           if [ "${{ github.event_name }}" = "issues" ]; then
             ITEM_URL="https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/${{ github.event.issue.number }}"
+            echo "📝 Issue URL: $ITEM_URL"
           else
             ITEM_URL="https://github.com/NightMira/amxModX_MultiMod-MirGame/pull/${{ github.event.pull_request.number }}"
+            echo "📝 PR URL: $ITEM_URL"
           fi
           
-          # Добавляем в проект организации MirGame-Studio
-          gh project item-add 2 \
-            --owner MirGame-Studio \
+          # Добавляем в проект (номер 3 для users/NightMira/projects/3)
+          echo "🏗️ Adding to project #3..."
+          gh project item-add 3 \
+            --owner NightMira \
             --url "$ITEM_URL"
           
           echo "✅ Added to project successfully!"
@@ -48,21 +51,25 @@ jobs:
         run: |
           echo "🔄 Updating project status for ${{ github.event_name }} #${{ github.event.issue.number || github.event.pull_request.number }}"
           
-          # Получаем ID проекта
+          # Получаем ID проекта (номер 3)
           PROJECT_ID=$(gh api graphql -f query='
             query {
-              organization(login: "MirGame-Studio") {
-                projectV2(number: 2) {
+              user(login: "NightMira") {
+                projectV2(number: 3) {
                   id
                 }
               }
             }
-          ' | jq -r '.data.organization.projectV2.id')
+          ' | jq -r '.data.user.projectV2.id')
+          
+          echo "📊 Project ID: $PROJECT_ID"
           
           if [ "${{ github.event_name }}" = "issues" ]; then
             CONTENT_ID="${{ github.event.issue.node_id }}"
+            echo "📋 Issue Node ID: $CONTENT_ID"
           else
             CONTENT_ID="${{ github.event.pull_request.node_id }}"
+            echo "📋 PR Node ID: $CONTENT_ID"
           fi
           
           if [ -n "$PROJECT_ID" ] && [ -n "$CONTENT_ID" ]; then
@@ -90,6 +97,8 @@ jobs:
                 }
               }
             ' | jq -r '.data.node.items.nodes[] | select(.content.id == "'$CONTENT_ID'") | .id')
+            
+            echo "🎯 Item ID: $ITEM_ID"
             
             if [ -n "$ITEM_ID" ]; then
               # Обновляем статус
@@ -120,5 +129,10 @@ jobs:
                   }
                 }
               '
+              echo "✅ Status updated successfully"
+            else
+              echo "⚠️ Item not found in project"
             fi
+          else
+            echo "⚠️ Missing Project ID or Content ID"
           fi
