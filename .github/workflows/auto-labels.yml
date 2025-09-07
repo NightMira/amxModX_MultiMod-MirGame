@@ -45,41 +45,100 @@ jobs:
               const content = `${title} ${body || ''}`.toLowerCase();
               const newLabels = new Set(labels.map(label => label.name));
 
-              // Определение меток на основе вашего labels.yml
-              const rules = [
-                { keywords: ['bug', 'ошибка', 'fix', 'исправление', 'баг'], label: 'bug' },
-                { keywords: ['feature', 'функция', 'улучшение', 'новая возможность', 'добавить'], label: 'feature' },
-                { keywords: ['refactor', 'рефакторинг', 'оптимизация', 'переработка'], label: 'refactor' },
-                { keywords: ['build', 'сборка', 'ci/cd', 'compile', 'компиляция'], label: 'build' },
-                { keywords: ['doc', 'documentation', 'документация', 'readme', 'инструкция'], label: 'docs' },
-                { keywords: ['test', 'тест', 'testing', 'тестирование'], label: 'test' },
-                { keywords: ['critical', 'критич', 'блокир', 'срочно', 'аварий'], label: 'priority-critical' },
-                { keywords: ['high', 'высок', 'важн', 'приоритет'], label: 'priority-high' },
-                { keywords: ['medium', 'средн', 'обычн'], label: 'priority-medium' },
-                { keywords: ['low', 'низк', 'улучшен', 'неважн'], label: 'priority-low' },
-                { keywords: ['compiler', 'компилятор', 'amxxpc', 'amxx'], label: 'component-compiler' },
-                { keywords: ['ci/cd', 'pipeline', 'github action', 'workflow', 'автоматизация'], label: 'component-ci-cd' },
-                { keywords: ['plugin', 'плагин', '.sma', '.amxx', 'модуль'], label: 'component-plugins' },
-                { keywords: ['doc', 'документ', 'readme', 'wiki', 'инструкция'], label: 'component-docs' },
-                { keywords: ['major', 'мажор', 'x.0.0'], label: 'version-major' },
-                { keywords: ['minor', 'минор', '0.y.0'], label: 'version-minor' },
-                { keywords: ['patch', 'патч', '0.0.z', 'исправление'], label: 'version-patch' },
-                { keywords: ['dev', 'разработка', 'development'], label: 'stage-dev' },
-                { keywords: ['alpha', 'альфа'], label: 'stage-alpha' },
-                { keywords: ['beta', 'бета'], label: 'stage-beta' },
-                { keywords: ['rc', 'release candidate', 'релиз-кандидат'], label: 'stage-rc' },
-                { keywords: ['release', 'релиз', 'production', 'продакшен'], label: 'stage-release' },
-                { keywords: ['hotfix', 'хотфикс', 'срочное исправление'], label: 'stage-hotfix' }
-              ];
+              // 📋 Task types
+              if (content.includes('bug') || content.includes('ошибка') || content.includes('error') || content.includes('fix') || content.includes('исправление') || content.includes('баг')) {
+                newLabels.add('bug');
+              }
 
-              rules.forEach(rule => {
-                if (rule.keywords.some(keyword => content.includes(keyword))) {
-                  newLabels.add(rule.label);
-                }
-              });
+              if (content.includes('feature') || content.includes('функция') || content.includes('улучшение') || content.includes('новая возможность') || content.includes('добавить')) {
+                newLabels.add('feature');
+              }
+
+              if (content.includes('refactor') || content.includes('рефакторинг') || content.includes('оптимизация') || content.includes('переработка')) {
+                newLabels.add('refactor');
+              }
+
+              if (content.includes('build') || content.includes('сборка') || content.includes('ci/cd') || content.includes('compile') || content.includes('компиляция')) {
+                newLabels.add('build');
+              }
+
+              if (content.includes('doc') || content.includes('documentation') || content.includes('документация') || content.includes('readme') || content.includes('инструкция')) {
+                newLabels.add('docs');
+              }
+
+              if (content.includes('test') || content.includes('тест') || content.includes('testing') || content.includes('тестирование')) {
+                newLabels.add('test');
+              }
+
+              // 🚨 Priorities
+              if (content.includes('critical') || content.includes('критич') || content.includes('блокир') || content.includes('срочно') || content.includes('аварий')) {
+                newLabels.add('priority-critical');
+              } else if (content.includes('high') || content.includes('высок') || content.includes('важн') || content.includes('приоритет')) {
+                newLabels.add('priority-high');
+              } else if (content.includes('medium') || content.includes('средн') || content.includes('обычн')) {
+                newLabels.add('priority-medium');
+              } else if (content.includes('low') || content.includes('низк') || content.includes('улучшен') || content.includes('неважн')) {
+                newLabels.add('priority-low');
+              }
+
+              // 🔧 Components
+              if (content.includes('compiler') || content.includes('компилятор') || content.includes('amxxpc') || content.includes('amxx')) {
+                newLabels.add('component-compiler');
+              }
+
+              if (content.includes('ci/cd') || content.includes('pipeline') || content.includes('github action') || content.includes('workflow') || content.includes('автоматизация')) {
+                newLabels.add('component-ci-cd');
+              }
+
+              if (content.includes('plugin') || content.includes('плагин') || content.includes('.sma') || content.includes('.amxx') || content.includes('модуль')) {
+                newLabels.add('component-plugins');
+              }
+
+              if (content.includes('doc') || content.includes('документ') || content.includes('readme') || content.includes('wiki') || content.includes('инструкция')) {
+                newLabels.add('component-docs');
+              }
+
+              // 🏷️ Versioning
+              if (content.includes('major') || content.includes('мажор') || content.includes('x.0.0')) {
+                newLabels.add('version-major');
+              }
+
+              if (content.includes('minor') || content.includes('минор') || content.includes('0.y.0')) {
+                newLabels.add('version-minor');
+              }
+
+              if (content.includes('patch') || content.includes('патч') || content.includes('0.0.z') || content.includes('hotfix') || content.includes('исправление')) {
+                newLabels.add('version-patch');
+              }
+
+              // 🚀 Release stages
+              if (content.includes('dev') || content.includes('разработка') || content.includes('development')) {
+                newLabels.add('stage-dev');
+              }
+
+              if (content.includes('alpha') || content.includes('альфа')) {
+                newLabels.add('stage-alpha');
+              }
+
+              if (content.includes('beta') || content.includes('бета')) {
+                newLabels.add('stage-beta');
+              }
+
+              if (content.includes('rc') || content.includes('release candidate') || content.includes('релиз-кандидат')) {
+                newLabels.add('stage-rc');
+              }
+
+              if (content.includes('release') || content.includes('релиз') || content.includes('production') || content.includes('продакшен')) {
+                newLabels.add('stage-release');
+              }
+
+              if (content.includes('hotfix') || content.includes('хотфикс') || content.includes('срочное исправление')) {
+                newLabels.add('stage-hotfix');
+              }
 
               // Для PR добавляем автоматические метки
               if (prData) {
+                // Все PR связаны с плагинами
                 newLabels.add('component-plugins');
                 
                 const { additions, deletions } = prData;
@@ -92,17 +151,14 @@ jobs:
                   newLabels.add('priority-high');
                 } else if (totalChanges > 50) {
                   newLabels.add('priority-medium');
-                } else {
+                } else if (totalChanges > 0) {
                   newLabels.add('priority-low');
                 }
 
-                // Определяем размер PR
-                if (totalChanges > 150) {
-                  newLabels.add('size-large');
-                } else if (totalChanges > 50) {
-                  newLabels.add('size-medium');
-                } else if (totalChanges > 0) {
-                  newLabels.add('size-small');
+                // Добавляем метку stage-dev для PR в dev ветку
+                const baseRef = prData.base.ref.toLowerCase();
+                if (baseRef === 'dev') {
+                  newLabels.add('stage-dev');
                 }
               }
 
