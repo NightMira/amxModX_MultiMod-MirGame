@@ -16,12 +16,7 @@ jobs:
   auto-label:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Checkout code (with private token)
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-
-      - name: 🏷️ Auto-label issues and PRs (using existing labels)
+      - name: 🏷️ Auto-label issues and PRs
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -49,7 +44,7 @@ jobs:
               const content = `${title} ${body || ''}`.toLowerCase();
               const currentLabels = new Set(labels.map(label => label.name));
 
-              // 📋 Task types - используем существующие имена меток из labels.yml
+              // 📋 Task types
               if (content.includes('bug') || content.includes('ошибка') || content.includes('error') || content.includes('fix') || content.includes('исправление') || content.includes('баг')) {
                 currentLabels.add('bug');
               }
@@ -147,7 +142,6 @@ jobs:
                 const { additions, deletions } = prData;
                 const totalChanges = additions + deletions;
                 
-                // Автоматически определяем приоритет по размеру изменений
                 if (totalChanges > 500) {
                   currentLabels.add('priority-critical');
                 } else if (totalChanges > 200) {
@@ -158,7 +152,6 @@ jobs:
                   currentLabels.add('priority-low');
                 }
 
-                // Добавляем stage-dev для PR в dev ветку
                 const baseRef = prData.base.ref.toLowerCase();
                 if (baseRef === 'dev') {
                   currentLabels.add('stage-dev');
@@ -168,9 +161,8 @@ jobs:
               const labelsToAdd = Array.from(currentLabels);
 
               if (labelsToAdd.length > 0) {
-                console.log(`🏷️ Setting existing labels: ${labelsToAdd.join(', ')}`);
+                console.log(`🏷️ Setting labels: ${labelsToAdd.join(', ')}`);
                 
-                // Используем setLabels для установки существующих меток
                 await github.rest.issues.setLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -178,19 +170,62 @@ jobs:
                   labels: labelsToAdd
                 });
                 
-                console.log('✅ Existing labels assigned successfully');
+                // Create summary
+                const summary = `
+                ## 🏷️ Auto-Label Summary
+                
+                ### 📋 ${type.toUpperCase()} Information
+                - **Number:** #${number}
+                - **Title:** ${title}
+                - **Type:** ${type}
+                
+                ### 📊 Labels Applied
+                ${labelsToAdd.map(label => `- \`${label}\``).join('\n')}
+                
+                ### 🔍 Content Analysis
+                Content processed for keyword matching.
+                
+                *Auto-labeled at ${new Date().toLocaleString()}*
+                `;
+                
+                // Write to summary
+                const fs = require('fs');
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+                
+                console.log('✅ Labels updated successfully');
               } else {
-                console.log('ℹ️ No matching labels to add');
+                console.log('ℹ️ No labels to add');
+                
+                const summary = `
+                ## 🏷️ Auto-Label Summary
+                
+                ### 📋 ${type.toUpperCase()} Information
+                - **Number:** #${number}
+                - **Title:** ${title}
+                - **Type:** ${type}
+                
+                ### ℹ️ No Labels Applied
+                No matching labels found based on content analysis.
+                
+                *Processed at ${new Date().toLocaleString()}*
+                `;
+                
+                const fs = require('fs');
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
               }
 
             } catch (error) {
               console.error('💥 Error in auto-label workflow:', error.message);
-              console.log('⚠️ Make sure all labels exist in the repository first');
+              
+              const summary = `
+              ## 🏷️ Auto-Label Summary
+              
+              ### ❌ Error Occurred
+              ${error.message}
+              
+              *Failed at ${new Date().toLocaleString()}*
+              `;
+              
+              const fs = require('fs');
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
             }
-
-      - name: 📋 Verify labels exist
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        run: |
-          echo "🔍 Checking if required labels exist..."
-          gh label list

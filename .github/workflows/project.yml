@@ -21,7 +21,32 @@ jobs:
         with:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
-      - name: 📋 Add new items to project (Simple version)
+      - name: 📋 Process project items
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          echo "## 🗂️ Project Automation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            echo "### 📝 Issue Processing" >> $GITHUB_STEP_SUMMARY
+            echo "- **Issue:** #${{ github.event.issue.number }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Title:** ${{ github.event.issue.title }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Action:** ${{ github.event.action }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 🔀 Pull Request Processing" >> $GITHUB_STEP_SUMMARY
+            echo "- **PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Title:** ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Action:** ${{ github.event.action }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Target Project" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project:** MirGame-Studio/Project#2" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📋 Add new items to project
         if: github.event_name == 'issues' && github.event.action == 'opened' || github.event_name == 'pull_request' && github.event.action == 'opened'
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -36,53 +61,23 @@ jobs:
             echo "📝 PR URL: $ITEM_URL"
           fi
           
-          # Простая команда добавления без GraphQL
-          echo "🏗️ Adding to project #3..."
+          # Добавляем в проект организации NightMira
           if gh project item-add 3 --owner NightMira --url "$ITEM_URL"; then
             echo "✅ Added to project successfully!"
+            echo "### ✅ Successfully Added to Project" >> $GITHUB_STEP_SUMMARY
+            echo "Item was successfully added to the project." >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Failed to add to project. Checking token permissions..."
-            
-            # Проверяем права токена
-            echo "🔍 Testing token permissions for projects..."
-            if gh project view 3 --owner NightMira >/dev/null 2>&1; then
-              echo "✅ Token can view project"
-            else
-              echo "❌ Token cannot access project"
-              echo "ℹ️ Please ensure PAT has 'project' permissions"
-            fi
+            echo "⚠️ Failed to add to project."
+            echo "### ⚠️ Failed to Add to Project" >> $GITHUB_STEP_SUMMARY
+            echo "There was an issue adding the item to the project." >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: 📋 Alternative project addition via API
-        if: always() && (github.event_name == 'issues' && github.event.action == 'opened' || github.event_name == 'pull_request' && github.event.action == 'opened')
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+      - name: 📋 Final summary
         run: |
-          echo "🔄 Trying alternative method..."
-          
-          # Альтернативный метод через REST API
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            CONTENT_ID="${{ github.event.issue.node_id }}"
-          else
-            CONTENT_ID="${{ github.event.pull_request.node_id }}"
-          fi
-          
-          # Пытаемся добавить через API
-          response=$(curl -s -w "%{http_code}" \
-            -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/projects/columns/cards" \
-            -d '{
-              "content_id": "'$CONTENT_ID'",
-              "content_type": "'${{ github.event_name }}'"
-            }' 2>/dev/null)
-          
-          http_code=$(echo "$response" | tail -n1)
-          if [ "$http_code" = "201" ]; then
-            echo "✅ Added to project via API"
-          else
-            echo "❌ API call failed with HTTP $http_code"
-            echo "⚠️ Project automation requires additional permissions"
-          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Workflow Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "*Automatically processed by GitHub Actions*" >> $GITHUB_STEP_SUMMARY

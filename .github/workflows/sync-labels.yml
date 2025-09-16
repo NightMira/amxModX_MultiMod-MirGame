@@ -12,7 +12,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: 🚀 Checkout code (with private token)
+      - name: 🚀 Checkout code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -25,10 +25,19 @@ jobs:
           manifest: .github/labels.yml
           prune: true
 
-      - name: 📊 Verify labels
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+      - name: 📊 Create summary
         run: |
-          echo "✅ Labels synchronized successfully!"
-          echo "📋 Available labels:"
-          gh label list --limit 10
+          echo "## 🏷️ Labels Synchronization Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Status" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Labels successfully synchronized from `.github/labels.yml`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Manifest Used" >> $GITHUB_STEP_SUMMARY
+          echo "Labels were synchronized using the following manifest:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          cat .github/labels.yml >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⏰ Timestamp" >> $GITHUB_STEP_SUMMARY
+          echo "$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
