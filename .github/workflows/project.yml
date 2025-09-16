@@ -21,7 +21,7 @@ jobs:
         with:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
-      - name: 📋 Add new items to project
+      - name: 📋 Add new items to project (Simple version)
         if: github.event_name == 'issues' && github.event.action == 'opened' || github.event_name == 'pull_request' && github.event.action == 'opened'
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -36,103 +36,53 @@ jobs:
             echo "📝 PR URL: $ITEM_URL"
           fi
           
-          # Добавляем в проект (номер 3 для users/NightMira/projects/3)
+          # Простая команда добавления без GraphQL
           echo "🏗️ Adding to project #3..."
-          gh project item-add 3 \
-            --owner NightMira \
-            --url "$ITEM_URL"
-          
-          echo "✅ Added to project successfully!"
+          if gh project item-add 3 --owner NightMira --url "$ITEM_URL"; then
+            echo "✅ Added to project successfully!"
+          else
+            echo "⚠️ Failed to add to project. Checking token permissions..."
+            
+            # Проверяем права токена
+            echo "🔍 Testing token permissions for projects..."
+            if gh project view 3 --owner NightMira >/dev/null 2>&1; then
+              echo "✅ Token can view project"
+            else
+              echo "❌ Token cannot access project"
+              echo "ℹ️ Please ensure PAT has 'project' permissions"
+            fi
+          fi
 
-      - name: 🏷️ Update project status
-        if: github.event.action == 'closed' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
+      - name: 📋 Alternative project addition via API
+        if: always() && (github.event_name == 'issues' && github.event.action == 'opened' || github.event_name == 'pull_request' && github.event.action == 'opened')
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
-          echo "🔄 Updating project status for ${{ github.event_name }} #${{ github.event.issue.number || github.event.pull_request.number }}"
+          echo "🔄 Trying alternative method..."
           
-          # Получаем ID проекта (номер 3)
-          PROJECT_ID=$(gh api graphql -f query='
-            query {
-              user(login: "NightMira") {
-                projectV2(number: 3) {
-                  id
-                }
-              }
-            }
-          ' | jq -r '.data.user.projectV2.id')
-          
-          echo "📊 Project ID: $PROJECT_ID"
-          
+          # Альтернативный метод через REST API
           if [ "${{ github.event_name }}" = "issues" ]; then
             CONTENT_ID="${{ github.event.issue.node_id }}"
-            echo "📋 Issue Node ID: $CONTENT_ID"
           else
             CONTENT_ID="${{ github.event.pull_request.node_id }}"
-            echo "📋 PR Node ID: $CONTENT_ID"
           fi
           
-          if [ -n "$PROJECT_ID" ] && [ -n "$CONTENT_ID" ]; then
-            # Находим ID элемента в проекте
-            ITEM_ID=$(gh api graphql -f query='
-              query {
-                node(id: "'$PROJECT_ID'") {
-                  ... on ProjectV2 {
-                    items(first: 50) {
-                      nodes {
-                        id
-                        content {
-                          ... on Issue {
-                            id
-                            number
-                          }
-                          ... on PullRequest {
-                            id
-                            number
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            ' | jq -r '.data.node.items.nodes[] | select(.content.id == "'$CONTENT_ID'") | .id')
-            
-            echo "🎯 Item ID: $ITEM_ID"
-            
-            if [ -n "$ITEM_ID" ]; then
-              # Обновляем статус
-              if [ "${{ github.event.action }}" = "closed" ]; then
-                STATUS="Done"
-              elif [ "${{ github.event.action }}" = "reopened" ] || [ "${{ github.event.action }}" = "ready_for_review" ]; then
-                STATUS="In Progress"
-              else
-                STATUS="Todo"
-              fi
-              
-              echo "📊 Setting status to: $STATUS"
-              
-              # Обновляем статус в проекте
-              gh api graphql -f query='
-                mutation {
-                  updateProjectV2ItemFieldValue(input: {
-                    projectId: "'$PROJECT_ID'",
-                    itemId: "'$ITEM_ID'",
-                    fieldId: "Status",
-                    value: {
-                      singleSelectOptionId: "'$STATUS'"
-                    }
-                  }) {
-                    projectV2Item {
-                      id
-                    }
-                  }
-                }
-              '
-              echo "✅ Status updated successfully"
-            else
-              echo "⚠️ Item not found in project"
-            fi
+          # Пытаемся добавить через API
+          response=$(curl -s -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/projects/columns/cards" \
+            -d '{
+              "content_id": "'$CONTENT_ID'",
+              "content_type": "'${{ github.event_name }}'"
+            }' 2>/dev/null)
+          
+          http_code=$(echo "$response" | tail -n1)
+          if [ "$http_code" = "201" ]; then
+            echo "✅ Added to project via API"
           else
-            echo "⚠️ Missing Project ID or Content ID"
+            echo "❌ API call failed with HTTP $http_code"
+            echo "⚠️ Project automation requires additional permissions"
           fi
