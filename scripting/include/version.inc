@@ -13,23 +13,23 @@
 #define PROJECT_DESCRIPTION         "Advanced AMXX Modification Framework"
 
 // Semantic Versioning (SemVer)
-#define PROJECT_VERSION_MAJOR       "0"
-#define PROJECT_VERSION_MAJOR_NUM   0
-#define PROJECT_VERSION_MINOR       "1"
-#define PROJECT_VERSION_MINOR_NUM   1
-#define PROJECT_VERSION_PATCH       "0"
-#define PROJECT_VERSION_PATCH_NUM   0
-#define PROJECT_VERSION             "0.1.0"
-#define PROJECT_VERSION_NUM         010
+#define PROJECT_VERSION_MAJOR "0"
+#define PROJECT_VERSION_MAJOR_NUM 0
+#define PROJECT_VERSION_MINOR "0"
+#define PROJECT_VERSION_MINOR_NUM 0
+#define PROJECT_VERSION_PATCH "4"
+#define PROJECT_VERSION_PATCH_NUM 4
+#define PROJECT_VERSION "0.0.4"
+#define PROJECT_VERSION_NUM 004
 
 // Version Suffix (Pre-release tags)
-#define PROJECT_VERSION_TAG         ""
-#define PROJECT_VERSION_SUFFIX      ""
+#define PROJECT_VERSION_TAG ""
+#define PROJECT_VERSION_SUFFIX ""
 
 // Build Information
 #define PROJECT_BUILD               "1"
 #define PROJECT_BUILD_NUM           1
-#define PROJECT_BUILD_DATE          "2025-09-05"
+#define PROJECT_BUILD_DATE "2025-09-16"
 #define PROJECT_BUILD_TIME          __TIME__
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 

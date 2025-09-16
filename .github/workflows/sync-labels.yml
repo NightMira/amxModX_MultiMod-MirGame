@@ -12,7 +12,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: 🚀 Checkout code (with private token)
+      - name: 🚀 Checkout code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -25,10 +25,33 @@ jobs:
           manifest: .github/labels.yml
           prune: true
 
-      - name: 📊 Verify labels
+      - name: 📊 Verify labels and create summary
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
           echo "✅ Labels synchronized successfully!"
-          echo "📋 Available labels:"
-          gh label list --limit 10
+          
+          # Получаем список меток
+          LABELS_LIST=$(gh label list || echo "Failed to get labels list")
+          
+          echo "## 🏷️ Labels Synchronization Summary" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Synchronization Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Manifest:** .github/labels.yml" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📊 Available Labels" >> $GITHUB_STEP_SUMMARY
+          echo "Total labels synchronized from manifest." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🏷️ Labels List" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$LABELS_LIST" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📝 Manifest Content" >> $GITHUB_STEP_SUMMARY
+          echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          cat .github/labels.yml >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

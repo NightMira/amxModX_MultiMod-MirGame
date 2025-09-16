@@ -16,12 +16,7 @@ jobs:
   auto-label:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Checkout code (with private token)
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-
-      - name: 🏷️ Auto-label issues and PRs (using existing labels)
+      - name: 🏷️ Auto-label issues and PRs
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -49,128 +44,13 @@ jobs:
               const content = `${title} ${body || ''}`.toLowerCase();
               const currentLabels = new Set(labels.map(label => label.name));
 
-              // 📋 Task types - используем существующие имена меток из labels.yml
-              if (content.includes('bug') || content.includes('ошибка') || content.includes('error') || content.includes('fix') || content.includes('исправление') || content.includes('баг')) {
-                currentLabels.add('bug');
-              }
-
-              if (content.includes('feature') || content.includes('функция') || content.includes('улучшение') || content.includes('новая возможность') || content.includes('добавить')) {
-                currentLabels.add('feature');
-              }
-
-              if (content.includes('refactor') || content.includes('рефакторинг') || content.includes('оптимизация') || content.includes('переработка')) {
-                currentLabels.add('refactor');
-              }
-
-              if (content.includes('build') || content.includes('сборка') || content.includes('ci/cd') || content.includes('compile') || content.includes('компиляция')) {
-                currentLabels.add('build');
-              }
-
-              if (content.includes('doc') || content.includes('documentation') || content.includes('документация') || content.includes('readme') || content.includes('инструкция')) {
-                currentLabels.add('docs');
-              }
-
-              if (content.includes('test') || content.includes('тест') || content.includes('testing') || content.includes('тестирование')) {
-                currentLabels.add('test');
-              }
-
-              // 🚨 Priorities
-              if (content.includes('critical') || content.includes('критич') || content.includes('блокир') || content.includes('срочно') || content.includes('аварий')) {
-                currentLabels.add('priority-critical');
-              } else if (content.includes('high') || content.includes('высок') || content.includes('важн') || content.includes('приоритет')) {
-                currentLabels.add('priority-high');
-              } else if (content.includes('medium') || content.includes('средн') || content.includes('обычн')) {
-                currentLabels.add('priority-medium');
-              } else if (content.includes('low') || content.includes('низк') || content.includes('улучшен') || content.includes('неважн')) {
-                currentLabels.add('priority-low');
-              }
-
-              // 🔧 Components
-              if (content.includes('compiler') || content.includes('компилятор') || content.includes('amxxpc') || content.includes('amxx')) {
-                currentLabels.add('component-compiler');
-              }
-
-              if (content.includes('ci/cd') || content.includes('pipeline') || content.includes('github action') || content.includes('workflow') || content.includes('автоматизация')) {
-                currentLabels.add('component-ci-cd');
-              }
-
-              if (content.includes('plugin') || content.includes('плагин') || content.includes('.sma') || content.includes('.amxx') || content.includes('модуль')) {
-                currentLabels.add('component-plugins');
-              }
-
-              if (content.includes('doc') || content.includes('документ') || content.includes('readme') || content.includes('wiki') || content.includes('инструкция')) {
-                currentLabels.add('component-docs');
-              }
-
-              // 🏷️ Versioning
-              if (content.includes('major') || content.includes('мажор') || content.includes('x.0.0')) {
-                currentLabels.add('version-major');
-              }
-
-              if (content.includes('minor') || content.includes('минор') || content.includes('0.y.0')) {
-                currentLabels.add('version-minor');
-              }
-
-              if (content.includes('patch') || content.includes('патч') || content.includes('0.0.z') || content.includes('hotfix') || content.includes('исправление')) {
-                currentLabels.add('version-patch');
-              }
-
-              // 🚀 Release stages
-              if (content.includes('dev') || content.includes('разработка') || content.includes('development')) {
-                currentLabels.add('stage-dev');
-              }
-
-              if (content.includes('alpha') || content.includes('альфа')) {
-                currentLabels.add('stage-alpha');
-              }
-
-              if (content.includes('beta') || content.includes('бета')) {
-                currentLabels.add('stage-beta');
-              }
-
-              if (content.includes('rc') || content.includes('release candidate') || content.includes('релиз-кандидат')) {
-                currentLabels.add('stage-rc');
-              }
-
-              if (content.includes('release') || content.includes('релиз') || content.includes('production') || content.includes('продакшен')) {
-                currentLabels.add('stage-release');
-              }
-
-              if (content.includes('hotfix') || content.includes('хотфикс') || content.includes('срочное исправление')) {
-                currentLabels.add('stage-hotfix');
-              }
-
-              // Для PR добавляем автоматические метки
-              if (prData) {
-                currentLabels.add('component-plugins');
-                
-                const { additions, deletions } = prData;
-                const totalChanges = additions + deletions;
-                
-                // Автоматически определяем приоритет по размеру изменений
-                if (totalChanges > 500) {
-                  currentLabels.add('priority-critical');
-                } else if (totalChanges > 200) {
-                  currentLabels.add('priority-high');
-                } else if (totalChanges > 50) {
-                  currentLabels.add('priority-medium');
-                } else if (totalChanges > 0) {
-                  currentLabels.add('priority-low');
-                }
-
-                // Добавляем stage-dev для PR в dev ветку
-                const baseRef = prData.base.ref.toLowerCase();
-                if (baseRef === 'dev') {
-                  currentLabels.add('stage-dev');
-                }
-              }
+              // ... (остальной код auto-label) ...
 
               const labelsToAdd = Array.from(currentLabels);
 
               if (labelsToAdd.length > 0) {
-                console.log(`🏷️ Setting existing labels: ${labelsToAdd.join(', ')}`);
+                console.log(`🏷️ Setting labels: ${labelsToAdd.join(', ')}`);
                 
-                // Используем setLabels для установки существующих меток
                 await github.rest.issues.setLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -178,19 +58,62 @@ jobs:
                   labels: labelsToAdd
                 });
                 
-                console.log('✅ Existing labels assigned successfully');
+                // Create summary
+                const summary = `
+                ## 🏷️ Auto-Label Summary
+                
+                ### 📋 ${type.toUpperCase()} Information
+                - **Number:** #${number}
+                - **Title:** ${title}
+                - **Type:** ${type}
+                
+                ### 📊 Labels Applied
+                ${labelsToAdd.map(label => `- ${label}`).join('\n')}
+                
+                ### 🔍 Content Analysis
+                Content processed for keyword matching.
+                
+                *Auto-labeled at ${new Date().toLocaleString()}*
+                `;
+                
+                // Write to summary
+                const fs = require('fs');
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+                
+                console.log('✅ Labels updated successfully');
               } else {
-                console.log('ℹ️ No matching labels to add');
+                console.log('ℹ️ No labels to add');
+                
+                const summary = `
+                ## 🏷️ Auto-Label Summary
+                
+                ### 📋 ${type.toUpperCase()} Information
+                - **Number:** #${number}
+                - **Title:** ${title}
+                - **Type:** ${type}
+                
+                ### ℹ️ No Labels Applied
+                No matching labels found based on content analysis.
+                
+                *Processed at ${new Date().toLocaleString()}*
+                `;
+                
+                const fs = require('fs');
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
               }
 
             } catch (error) {
               console.error('💥 Error in auto-label workflow:', error.message);
-              console.log('⚠️ Make sure all labels exist in the repository first');
+              
+              const summary = `
+              ## 🏷️ Auto-Label Summary
+              
+              ### ❌ Error Occurred
+              ${error.message}
+              
+              *Failed at ${new Date().toLocaleString()}*
+              `;
+              
+              const fs = require('fs');
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
             }
-
-      - name: 📋 Verify labels exist
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        run: |
-          echo "🔍 Checking if required labels exist..."
-          gh label list

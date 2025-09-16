@@ -131,17 +131,31 @@ jobs:
       - name: 📋 Create build summary
         run: |
           FULL_VERSION=$(python3 update_version.py get-full-version)
+          BUILD_INFO=$(python3 update_version.py info)
+          COMPILE_RESULT=$(tail -10 compile.log | grep -E "✅|❌|⚠️" || echo "No compilation results found")
+          
           echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
-          echo "**Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "**Artifact:** amxx-plugins-${{ env.ARTIFACT_SUFFIX }}" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Project Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact:** amxx-plugins-${{ env.ARTIFACT_SUFFIX }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          echo "### 📊 Version Details" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Version Details" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "$BUILD_INFO" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          python3 update_version.py info >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🔧 Compilation Results" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$COMPILE_RESULT" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "Download the compiled plugins from the Artifacts section." >> $GITHUB_STEP_SUMMARY
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
