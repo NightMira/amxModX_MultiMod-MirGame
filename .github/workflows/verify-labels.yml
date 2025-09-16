@@ -24,14 +24,38 @@ jobs:
           # Читаем метки из labels.yml
           labels=$(grep -E "name:" .github/labels.yml | awk -F '"' '{print $2}')
           
+          # Получаем список существующих меток
+          existing_labels=$(gh label list --limit 100 | awk '{print $1}')
+          
           for label in $labels; do
-            if gh label view "$label" >/dev/null 2>&1; then
+            if echo "$existing_labels" | grep -q "^$label$"; then
               echo "✅ Label exists: $label"
             else
               echo "❌ Label missing: $label"
               echo "   Creating missing label..."
-              gh label create "$label" --color "000000" --description "Auto-created label" --force
+              
+              # Получаем цвет и описание из labels.yml
+              color=$(grep -A2 "name: \"$label\"" .github/labels.yml | grep "color:" | awk -F '"' '{print $2}')
+              description=$(grep -A2 "name: \"$label\"" .github/labels.yml | grep "description:" | awk -F '"' '{print $2}')
+              
+              # Устанавливаем значения по умолчанию
+              color=${color:-"000000"}
+              description=${description:-"Auto-created label"}
+              
+              gh label create "$label" --color "$color" --description "$description" --force
             fi
           done
           
           echo "✅ All labels verified!"
+          
+          # Создаем summary
+          echo "## 🏷️ Label Verification Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Verification Status" >> $GITHUB_STEP_SUMMARY
+          echo "All labels from `.github/labels.yml` have been verified." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Labels Processed" >> $GITHUB_STEP_SUMMARY
+          echo "Total labels in manifest: $(echo "$labels" | wc -w)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⏰ Timestamp" >> $GITHUB_STEP_SUMMARY
+          echo "$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
