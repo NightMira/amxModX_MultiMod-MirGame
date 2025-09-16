@@ -2,3 +2,5 @@ amxxpc
 amxxpc32.so
 compiled/*
 compile.log
+.github/ISSUE_TEMPLATE/command.md
+.gitignore
