@@ -61,8 +61,8 @@ jobs:
             echo "📝 PR URL: $ITEM_URL"
           fi
           
-          # Добавляем в проект организации MirGame-Studio
-          if gh project item-add 2 --owner MirGame-Studio --url "$ITEM_URL"; then
+          # Добавляем в проект организации NightMira
+          if gh project item-add 3 --owner NightMira --url "$ITEM_URL"; then
             echo "✅ Added to project successfully!"
             echo "### ✅ Successfully Added to Project" >> $GITHUB_STEP_SUMMARY
             echo "Item was successfully added to the project." >> $GITHUB_STEP_SUMMARY
