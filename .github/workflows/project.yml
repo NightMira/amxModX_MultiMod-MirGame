@@ -46,7 +46,7 @@ jobs:
           echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: 📋 Add new items to project (Simple version)
+      - name: 📋 Add new items to project
         if: github.event_name == 'issues' && github.event.action == 'opened' || github.event_name == 'pull_request' && github.event.action == 'opened'
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -71,18 +71,6 @@ jobs:
             echo "### ⚠️ Failed to Add to Project" >> $GITHUB_STEP_SUMMARY
             echo "There was an issue adding the item to the project." >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: 🏷️ Update project status
-        if: github.event.action == 'closed' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        run: |
-          echo "🔄 Updating project status for ${{ github.event_name }} #${{ github.event.issue.number || github.event.pull_request.number }}"
-          
-          # Логика обновления статуса...
-          
-          echo "### 🔄 Status Updated" >> $GITHUB_STEP_SUMMARY
-          echo "Project item status was updated based on the action." >> $GITHUB_STEP_SUMMARY
 
       - name: 📋 Final summary
         run: |

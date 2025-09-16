@@ -44,7 +44,119 @@ jobs:
               const content = `${title} ${body || ''}`.toLowerCase();
               const currentLabels = new Set(labels.map(label => label.name));
 
-              // ... (остальной код auto-label) ...
+              // 📋 Task types
+              if (content.includes('bug') || content.includes('ошибка') || content.includes('error') || content.includes('fix') || content.includes('исправление') || content.includes('баг')) {
+                currentLabels.add('bug');
+              }
+
+              if (content.includes('feature') || content.includes('функция') || content.includes('улучшение') || content.includes('новая возможность') || content.includes('добавить')) {
+                currentLabels.add('feature');
+              }
+
+              if (content.includes('refactor') || content.includes('рефакторинг') || content.includes('оптимизация') || content.includes('переработка')) {
+                currentLabels.add('refactor');
+              }
+
+              if (content.includes('build') || content.includes('сборка') || content.includes('ci/cd') || content.includes('compile') || content.includes('компиляция')) {
+                currentLabels.add('build');
+              }
+
+              if (content.includes('doc') || content.includes('documentation') || content.includes('документация') || content.includes('readme') || content.includes('инструкция')) {
+                currentLabels.add('docs');
+              }
+
+              if (content.includes('test') || content.includes('тест') || content.includes('testing') || content.includes('тестирование')) {
+                currentLabels.add('test');
+              }
+
+              // 🚨 Priorities
+              if (content.includes('critical') || content.includes('критич') || content.includes('блокир') || content.includes('срочно') || content.includes('аварий')) {
+                currentLabels.add('priority-critical');
+              } else if (content.includes('high') || content.includes('высок') || content.includes('важн') || content.includes('приоритет')) {
+                currentLabels.add('priority-high');
+              } else if (content.includes('medium') || content.includes('средн') || content.includes('обычн')) {
+                currentLabels.add('priority-medium');
+              } else if (content.includes('low') || content.includes('низк') || content.includes('улучшен') || content.includes('неважн')) {
+                currentLabels.add('priority-low');
+              }
+
+              // 🔧 Components
+              if (content.includes('compiler') || content.includes('компилятор') || content.includes('amxxpc') || content.includes('amxx')) {
+                currentLabels.add('component-compiler');
+              }
+
+              if (content.includes('ci/cd') || content.includes('pipeline') || content.includes('github action') || content.includes('workflow') || content.includes('автоматизация')) {
+                currentLabels.add('component-ci-cd');
+              }
+
+              if (content.includes('plugin') || content.includes('плагин') || content.includes('.sma') || content.includes('.amxx') || content.includes('модуль')) {
+                currentLabels.add('component-plugins');
+              }
+
+              if (content.includes('doc') || content.includes('документ') || content.includes('readme') || content.includes('wiki') || content.includes('инструкция')) {
+                currentLabels.add('component-docs');
+              }
+
+              // 🏷️ Versioning
+              if (content.includes('major') || content.includes('мажор') || content.includes('x.0.0')) {
+                currentLabels.add('version-major');
+              }
+
+              if (content.includes('minor') || content.includes('минор') || content.includes('0.y.0')) {
+                currentLabels.add('version-minor');
+              }
+
+              if (content.includes('patch') || content.includes('патч') || content.includes('0.0.z') || content.includes('hotfix') || content.includes('исправление')) {
+                currentLabels.add('version-patch');
+              }
+
+              // 🚀 Release stages
+              if (content.includes('dev') || content.includes('разработка') || content.includes('development')) {
+                currentLabels.add('stage-dev');
+              }
+
+              if (content.includes('alpha') || content.includes('альфа')) {
+                currentLabels.add('stage-alpha');
+              }
+
+              if (content.includes('beta') || content.includes('бета')) {
+                currentLabels.add('stage-beta');
+              }
+
+              if (content.includes('rc') || content.includes('release candidate') || content.includes('релиз-кандидат')) {
+                currentLabels.add('stage-rc');
+              }
+
+              if (content.includes('release') || content.includes('релиз') || content.includes('production') || content.includes('продакшен')) {
+                currentLabels.add('stage-release');
+              }
+
+              if (content.includes('hotfix') || content.includes('хотфикс') || content.includes('срочное исправление')) {
+                currentLabels.add('stage-hotfix');
+              }
+
+              // Для PR добавляем автоматические метки
+              if (prData) {
+                currentLabels.add('component-plugins');
+                
+                const { additions, deletions } = prData;
+                const totalChanges = additions + deletions;
+                
+                if (totalChanges > 500) {
+                  currentLabels.add('priority-critical');
+                } else if (totalChanges > 200) {
+                  currentLabels.add('priority-high');
+                } else if (totalChanges > 50) {
+                  currentLabels.add('priority-medium');
+                } else if (totalChanges > 0) {
+                  currentLabels.add('priority-low');
+                }
+
+                const baseRef = prData.base.ref.toLowerCase();
+                if (baseRef === 'dev') {
+                  currentLabels.add('stage-dev');
+                }
+              }
 
               const labelsToAdd = Array.from(currentLabels);
 
@@ -68,7 +180,7 @@ jobs:
                 - **Type:** ${type}
                 
                 ### 📊 Labels Applied
-                ${labelsToAdd.map(label => `- ${label}`).join('\n')}
+                ${labelsToAdd.map(label => `- \`${label}\``).join('\n')}
                 
                 ### 🔍 Content Analysis
                 Content processed for keyword matching.

@@ -25,33 +25,19 @@ jobs:
           manifest: .github/labels.yml
           prune: true
 
-      - name: 📊 Verify labels and create summary
-        env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+      - name: 📊 Create summary
         run: |
-          echo "✅ Labels synchronized successfully!"
-          
-          # Получаем список меток
-          LABELS_LIST=$(gh label list || echo "Failed to get labels list")
-          
-          echo "## 🏷️ Labels Synchronization Summary" >> $GITHUB_STEP_SUMMARY
-          echo "### 📋 Synchronization Status" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
-          echo "- **Manifest:** .github/labels.yml" >> $GITHUB_STEP_SUMMARY
-          echo "- **Timestamp:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏷️ Labels Synchronization Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "### 📊 Available Labels" >> $GITHUB_STEP_SUMMARY
-          echo "Total labels synchronized from manifest." >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Status" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Labels successfully synchronized from `.github/labels.yml`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "### 🏷️ Labels List" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "$LABELS_LIST" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Manifest Used" >> $GITHUB_STEP_SUMMARY
+          echo "Labels were synchronized using the following manifest:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "### 📝 Manifest Content" >> $GITHUB_STEP_SUMMARY
           echo '```yaml' >> $GITHUB_STEP_SUMMARY
           cat .github/labels.yml >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⏰ Timestamp" >> $GITHUB_STEP_SUMMARY
+          echo "$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
