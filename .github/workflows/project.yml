@@ -42,7 +42,7 @@ jobs:
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🎯 Target Project" >> $GITHUB_STEP_SUMMARY
-          echo "- **Project:** MirGame-Studio/Project#2" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project:** NightMira/Project#3" >> $GITHUB_STEP_SUMMARY
           echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
