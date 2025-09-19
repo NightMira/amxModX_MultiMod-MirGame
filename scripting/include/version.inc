@@ -23,8 +23,8 @@
 #define PROJECT_VERSION_NUM 005
 
 // Version Suffix (Pre-release tags)
-#define PROJECT_VERSION_TAG "BETA.1"
-#define PROJECT_VERSION_SUFFIX "-beta.1"
+#define PROJECT_VERSION_TAG "RC.1"
+#define PROJECT_VERSION_SUFFIX "-rc.1"
 
 // Build Information
 #define PROJECT_BUILD "122"
