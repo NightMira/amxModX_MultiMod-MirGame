@@ -5,7 +5,7 @@ on:
   issues:
     types: [opened, edited]
   pull_request:
-    types: [opened, edited, synchronize]
+    types: [opened, edited, synchronize, ready_for_review]
 
 permissions:
   contents: read
@@ -44,101 +44,107 @@ jobs:
               const content = `${title} ${body || ''}`.toLowerCase();
               const currentLabels = new Set(labels.map(label => label.name));
 
-              // 📋 Task types
-              if (content.includes('bug') || content.includes('ошибка') || content.includes('error') || content.includes('fix') || content.includes('исправление') || content.includes('баг')) {
-                currentLabels.add('bug');
+              // ==================== 🎯 TASK TYPES ====================
+              if (content.includes('bug') || content.includes('ошибка') || content.includes('error') || content.includes('fix') || content.includes('исправление') || content.includes('баг') || content.includes('не работает')) {
+                currentLabels.add('type-bug');
               }
 
-              if (content.includes('feature') || content.includes('функция') || content.includes('улучшение') || content.includes('новая возможность') || content.includes('добавить')) {
-                currentLabels.add('feature');
+              if (content.includes('feature') || content.includes('функция') || content.includes('улучшение') || content.includes('новая возможность') || content.includes('добавить') || content.includes('предложение')) {
+                currentLabels.add('type-feature');
               }
 
-              if (content.includes('refactor') || content.includes('рефакторинг') || content.includes('оптимизация') || content.includes('переработка')) {
-                currentLabels.add('refactor');
+              if (content.includes('refactor') || content.includes('рефакторинг') || content.includes('оптимизация') || content.includes('переработка') || content.includes('cleanup')) {
+                currentLabels.add('type-refactor');
               }
 
-              if (content.includes('build') || content.includes('сборка') || content.includes('ci/cd') || content.includes('compile') || content.includes('компиляция')) {
-                currentLabels.add('build');
+              if (content.includes('build') || content.includes('сборка') || content.includes('ci/cd') || content.includes('compile') || content.includes('компиляция') || content.includes('pipeline')) {
+                currentLabels.add('type-build');
               }
 
-              if (content.includes('doc') || content.includes('documentation') || content.includes('документация') || content.includes('readme') || content.includes('инструкция')) {
-                currentLabels.add('docs');
+              if (content.includes('doc') || content.includes('documentation') || content.includes('документация') || content.includes('readme') || content.includes('инструкция') || content.includes('wiki')) {
+                currentLabels.add('type-docs');
               }
 
-              if (content.includes('test') || content.includes('тест') || content.includes('testing') || content.includes('тестирование')) {
-                currentLabels.add('test');
+              if (content.includes('test') || content.includes('тест') || content.includes('testing') || content.includes('тестирование') || content.includes('проверка')) {
+                currentLabels.add('type-test');
               }
 
-              // 🚨 Priorities
-              if (content.includes('critical') || content.includes('критич') || content.includes('блокир') || content.includes('срочно') || content.includes('аварий')) {
+              // ==================== ⚡ PRIORITIES ====================
+              if (content.includes('critical') || content.includes('критич') || content.includes('блокир') || content.includes('срочно') || content.includes('аварий') || content.includes('urgent')) {
                 currentLabels.add('priority-critical');
-              } else if (content.includes('high') || content.includes('высок') || content.includes('важн') || content.includes('приоритет')) {
+              } else if (content.includes('high') || content.includes('высок') || content.includes('важн') || content.includes('приоритет') || content.includes('important')) {
                 currentLabels.add('priority-high');
-              } else if (content.includes('medium') || content.includes('средн') || content.includes('обычн')) {
+              } else if (content.includes('medium') || content.includes('средн') || content.includes('обычн') || content.includes('normal')) {
                 currentLabels.add('priority-medium');
-              } else if (content.includes('low') || content.includes('низк') || content.includes('улучшен') || content.includes('неважн')) {
+              } else if (content.includes('low') || content.includes('низк') || content.includes('улучшен') || content.includes('неважн') || content.includes('minor')) {
                 currentLabels.add('priority-low');
               }
 
-              // 🔧 Components
-              if (content.includes('compiler') || content.includes('компилятор') || content.includes('amxxpc') || content.includes('amxx')) {
+              // ==================== 🧩 COMPONENTS ====================
+              if (content.includes('compiler') || content.includes('компилятор') || content.includes('amxxpc') || content.includes('amxx') || content.includes('сборк')) {
                 currentLabels.add('component-compiler');
               }
 
-              if (content.includes('ci/cd') || content.includes('pipeline') || content.includes('github action') || content.includes('workflow') || content.includes('автоматизация')) {
+              if (content.includes('ci/cd') || content.includes('pipeline') || content.includes('github action') || content.includes('workflow') || content.includes('автоматизация') || content.includes('action')) {
                 currentLabels.add('component-ci-cd');
               }
 
-              if (content.includes('plugin') || content.includes('плагин') || content.includes('.sma') || content.includes('.amxx') || content.includes('модуль')) {
+              if (content.includes('plugin') || content.includes('плагин') || content.includes('.sma') || content.includes('.amxx') || content.includes('модуль') || content.includes('script')) {
                 currentLabels.add('component-plugins');
               }
 
-              if (content.includes('doc') || content.includes('документ') || content.includes('readme') || content.includes('wiki') || content.includes('инструкция')) {
+              if (content.includes('doc') || content.includes('документ') || content.includes('readme') || content.includes('wiki') || content.includes('инструкция') || content.includes('guide')) {
                 currentLabels.add('component-docs');
               }
 
-              // 🏷️ Versioning
-              if (content.includes('major') || content.includes('мажор') || content.includes('x.0.0')) {
+              if (content.includes('version') || content.includes('версия') || content.includes('semver') || content.includes('release') || content.includes('версионирование')) {
+                currentLabels.add('component-versioning');
+              }
+
+              // ==================== 📊 VERSIONING ====================
+              if (content.includes('major') || content.includes('мажор') || content.includes('x.0.0') || content.includes('breaking')) {
                 currentLabels.add('version-major');
               }
 
-              if (content.includes('minor') || content.includes('минор') || content.includes('0.y.0')) {
+              if (content.includes('minor') || content.includes('минор') || content.includes('0.y.0') || content.includes('feature')) {
                 currentLabels.add('version-minor');
               }
 
-              if (content.includes('patch') || content.includes('патч') || content.includes('0.0.z') || content.includes('hotfix') || content.includes('исправление')) {
+              if (content.includes('patch') || content.includes('патч') || content.includes('0.0.z') || content.includes('hotfix') || content.includes('исправление') || content.includes('bugfix')) {
                 currentLabels.add('version-patch');
               }
 
-              // 🚀 Release stages
-              if (content.includes('dev') || content.includes('разработка') || content.includes('development')) {
+              // ==================== 🚀 RELEASE STAGES ====================
+              if (content.includes('dev') || content.includes('разработка') || content.includes('development') || content.includes('wip')) {
                 currentLabels.add('stage-dev');
               }
 
-              if (content.includes('alpha') || content.includes('альфа')) {
+              if (content.includes('alpha') || content.includes('альфа') || content.includes('test')) {
                 currentLabels.add('stage-alpha');
               }
 
-              if (content.includes('beta') || content.includes('бета')) {
+              if (content.includes('beta') || content.includes('бета') || content.includes('testing')) {
                 currentLabels.add('stage-beta');
               }
 
-              if (content.includes('rc') || content.includes('release candidate') || content.includes('релиз-кандидат')) {
+              if (content.includes('rc') || content.includes('release candidate') || content.includes('релиз-кандидат') || content.includes('pre-release')) {
                 currentLabels.add('stage-rc');
               }
 
-              if (content.includes('release') || content.includes('релиз') || content.includes('production') || content.includes('продакшен')) {
+              if (content.includes('release') || content.includes('релиз') || content.includes('production') || content.includes('продакшен') || content.includes('final')) {
                 currentLabels.add('stage-release');
               }
 
-              if (content.includes('hotfix') || content.includes('хотфикс') || content.includes('срочное исправление')) {
+              if (content.includes('hotfix') || content.includes('хотфикс') || content.includes('срочное исправление') || content.includes('emergency')) {
                 currentLabels.add('stage-hotfix');
               }
 
-              // Для PR добавляем автоматические метки
+              // ==================== 🔄 PR-SPECIFIC LOGIC ====================
               if (prData) {
+                // Автоматически добавляем метку компонента для PR
                 currentLabels.add('component-plugins');
                 
+                // Определяем приоритет на основе размера изменений
                 const { additions, deletions } = prData;
                 const totalChanges = additions + deletions;
                 
@@ -152,12 +158,33 @@ jobs:
                   currentLabels.add('priority-low');
                 }
 
+                // Определяем стадию на основе целевой ветки
                 const baseRef = prData.base.ref.toLowerCase();
-                if (baseRef === 'dev') {
+                if (baseRef === 'main') {
+                  currentLabels.add('stage-release');
+                } else if (baseRef === 'dev') {
                   currentLabels.add('stage-dev');
+                } else if (baseRef.includes('alpha')) {
+                  currentLabels.add('stage-alpha');
+                } else if (baseRef.includes('beta')) {
+                  currentLabels.add('stage-beta');
+                } else if (baseRef.includes('rc')) {
+                  currentLabels.add('stage-rc');
+                } else if (baseRef.includes('hotfix')) {
+                  currentLabels.add('stage-hotfix');
                 }
+
+                // Добавляем workflow метки для PR
+                currentLabels.add('workflow-needs-review');
               }
 
+              // ==================== 🎯 ISSUE-SPECIFIC LOGIC ====================
+              if (issueData) {
+                // Для issue добавляем метку workflow
+                currentLabels.add('workflow-auto');
+              }
+
+              // Удаляем дубликаты и преобразуем в массив
               const labelsToAdd = Array.from(currentLabels);
 
               if (labelsToAdd.length > 0) {
