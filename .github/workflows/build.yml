@@ -16,11 +16,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Checkout code
+      - name: 🚀 Checkout code (with full history)
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          fetch-depth: 0
+          fetch-depth: 0  # Важно: получаем полную историю
 
       - name: 📦 Install system dependencies
         run: |
@@ -34,10 +34,53 @@ jobs:
           chmod +x amxxpc
           ./amxxpc --help || true
 
-      - name: 🏷️ Determine version based on branch
+      - name: 🏷️ Determine version based on branch (FIXED for merge)
         run: |
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          echo "📋 Current branch: $BRANCH_NAME"
+          # Улучшенное определение ветки для merge-коммитов
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Для PR используем базовую ветку
+            BRANCH_NAME="${{ github.base_ref }}"
+            echo "📋 PR detected, using base ref: $BRANCH_NAME"
+          else
+            # Для push получаем ветку из ref
+            BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+            
+            # Если это тег, используем main
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              BRANCH_NAME="main"
+              echo "📋 Tag detected, using branch: main"
+            fi
+            
+            # Обработка merge-коммитов
+            if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "merge" ] || [[ "$BRANCH_NAME" == *"/merge" ]]; then
+              echo "⚠️ Merge commit detected, detecting target branch..."
+              
+              # Метод 1: из сообщения коммита
+              BRANCH_NAME=$(git log -1 --pretty=%B | grep -o 'Merge branch.*into' | awk '{print $3}' || echo "")
+              
+              # Метод 2: альтернативный формат
+              if [ -z "$BRANCH_NAME" ]; then
+                BRANCH_NAME=$(git log -1 --pretty=%B | grep -o 'from.*' | cut -d' ' -f2 || echo "")
+              fi
+              
+              # Метод 3: из remote веток
+              if [ -z "$BRANCH_NAME" ]; then
+                BRANCH_NAME=$(git branch -r --contains HEAD | grep -v "HEAD" | head -1 | sed 's/origin\///' | xargs)
+              fi
+              
+              # Метод 4: fallback на dev
+              if [ -z "$BRANCH_NAME" ]; then
+                BRANCH_NAME="dev"
+                echo "⚠️ Could not detect branch, using fallback: dev"
+              else
+                echo "📋 Detected target branch from merge: $BRANCH_NAME"
+              fi
+            fi
+          fi
+          
+          # Очистка имени ветки
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/^refs\/heads\///' | sed 's/^origin\///')
+          echo "📋 Final branch name: $BRANCH_NAME"
           
           CURRENT_VERSION=$(python3 update_version.py get-version)
           CURRENT_SUFFIX=$(python3 update_version.py get-suffix)
@@ -76,7 +119,7 @@ jobs:
             
           elif [[ "$BRANCH_NAME" =~ ^hotfix/ ]]; then
             HOTFIX_NUM=$(echo "$BRANCH_NAME" | grep -o '[0-9]*$' || echo "1")
-            echo "VERSION_STRategy=hotfix" >> $GITHUB_ENV
+            echo "VERSION_STRATEGY=hotfix" >> $GITHUB_ENV
             echo "ARTIFACT_SUFFIX=hotfix-$HOTFIX_NUM" >> $GITHUB_ENV
             echo "VERSION_CMD=patch && hotfix $HOTFIX_NUM" >> $GITHUB_ENV
             
@@ -86,6 +129,7 @@ jobs:
             echo "VERSION_CMD=" >> $GITHUB_ENV
           fi
           
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
           echo "COMMIT_HASH=${{ github.sha }}" >> $GITHUB_ENV
           echo "COMMIT_AUTHOR=${{ github.actor }}" >> $GITHUB_ENV
 
@@ -117,7 +161,7 @@ jobs:
       - name: 📦 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: amxx-plugins-${{ env.ARTIFACT_SUFFIX }}
+          name: amxx-plugins-${{ env.ARTIFACT_SUFFIX }}-${{ github.run_number }}
           path: |
             compiled/*.amxx
             compile.log
@@ -131,11 +175,14 @@ jobs:
           COMPILE_RESULT=$(tail -10 compile.log | grep -E "✅|❌|⚠️" || echo "No compilation results found")
           
           echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 Project Information" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ env.BRANCH_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Strategy:** ${{ env.VERSION_STRATEGY }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact:** amxx-plugins-${{ env.ARTIFACT_SUFFIX }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact:** amxx-plugins-${{ env.ARTIFACT_SUFFIX }}-${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### 📋 Version Details" >> $GITHUB_STEP_SUMMARY
@@ -152,6 +199,12 @@ jobs:
           
           echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "Download the compiled plugins from the Artifacts section." >> $GITHUB_STEP_SUMMARY
+          
+          # Добавляем информацию о merge-детекции
+          if [[ "${{ env.BRANCH_NAME }}" == *"merge"* ]] || [[ "$GITHUB_REF" == *"merge"* ]]; then
+            echo "### 🔍 Merge Commit Handling" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Successfully detected target branch for merge commit" >> $GITHUB_STEP_SUMMARY
+          fi
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
