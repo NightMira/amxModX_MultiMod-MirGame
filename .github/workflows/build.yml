@@ -93,11 +93,7 @@ jobs:
           elif [[ "$BRANCH_NAME" == "dev" ]]; then
             echo "VERSION_STRATEGY=snapshot" >> $GITHUB_ENV
             echo "ARTIFACT_SUFFIX=dev" >> $GITHUB_ENV
-            if [[ "$CURRENT_SUFFIX" != *"SNAPSHOT"* ]]; then
-              echo "VERSION_CMD=snapshot" >> $GITHUB_ENV
-            else
-              echo "VERSION_CMD=" >> $GITHUB_ENV
-            fi
+            echo "VERSION_CMD=snapshot auto" >> $GITHUB_ENV
             
           elif [[ "$BRANCH_NAME" =~ ^pre-release/alpha/ ]]; then
             ALPHA_NUM="${BRANCH_NAME##*/}"

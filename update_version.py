@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import re, datetime, os, sys, json
+import re, datetime, os, sys, json, subprocess
 
 VERSION_FILE = "scripting/include/version.inc"
 
@@ -30,7 +30,6 @@ def get_current_version_info():
         with open(VERSION_FILE, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Упрощенные регулярные выражения
         def find_define(pattern):
             match = re.search(pattern, content, re.MULTILINE)
             return match.group(1) if match else None
@@ -56,7 +55,6 @@ def get_current_version_info():
         return None
 
 def safe_update_define(content, define_name, new_value, is_string=True):
-    """Безопасно обновляет define в содержимом файла"""
     if is_string:
         pattern = rf'#define {define_name}\s+"[^"]*"'
         replacement = f'#define {define_name} "{new_value}"'
@@ -73,7 +71,6 @@ def safe_update_define(content, define_name, new_value, is_string=True):
     return new_content, True
 
 def update_version_define(define_name, new_value, is_string=True):
-    """Обновляет одно определение в файле"""
     try:
         with open(VERSION_FILE, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -81,8 +78,6 @@ def update_version_define(define_name, new_value, is_string=True):
         new_content, success = safe_update_define(content, define_name, new_value, is_string)
         
         if not success:
-            print(f"⚠️ Define {define_name} not found, adding at the end")
-            # Добавляем перед последним #endif
             if '#endif // _version_included' in new_content:
                 new_content = new_content.replace('#endif // _version_included', 
                                                  f'#define {define_name} "{new_value}"\n#endif // _version_included' 
@@ -98,24 +93,21 @@ def update_version_define(define_name, new_value, is_string=True):
         return False
 
 def update_build_date():
-    """Обновляет дату сборки"""
     return update_version_define('PROJECT_BUILD_DATE', datetime.datetime.now().strftime('%Y-%m-%d'))
 
 def update_version_num(major, minor, patch):
-    version_num = f"{major}{minor}{patch}"
+    version_num = int(f"{major:02d}{minor:02d}{patch:02d}")
     return update_version_define('PROJECT_VERSION_NUM', version_num, False)
 
-
 def update_numeric_version(major, minor, patch):
-    """Обновляет числовые представления версии"""
     success = True
     success &= update_version_define('PROJECT_VERSION_MAJOR', str(major))
-    success &= update_version_define('PROJECT_VERSION_MAJOR_NUM', str(major), False)
+    success &= update_version_define('PROJECT_VERSION_MAJOR_NUM', major, False)
     success &= update_version_define('PROJECT_VERSION_MINOR', str(minor))
-    success &= update_version_define('PROJECT_VERSION_MINOR_NUM', str(minor), False)
+    success &= update_version_define('PROJECT_VERSION_MINOR_NUM', minor, False)
     success &= update_version_define('PROJECT_VERSION_PATCH', str(patch))
-    success &= update_version_define('PROJECT_VERSION_PATCH_NUM', str(patch), False)
-    success &= update_version_num(major, minor, patch)  # Обновляем PROJECT_VERSION_NUM
+    success &= update_version_define('PROJECT_VERSION_PATCH_NUM', patch, False)
+    success &= update_version_num(major, minor, patch)
     return success
 
 def increment_version(version_type):
@@ -150,12 +142,9 @@ def increment_version(version_type):
     print(f"🔄 Updating version: {old_version} → {new_version}")
     print("📌 Removing version suffix (as per SemVer rules)")
     
-    # Обновляем все связанные определения
     success1 = update_version_define('PROJECT_VERSION', new_version)
     success2 = update_numeric_version(major, minor, patch)
     success3 = update_build_date()
-    
-    # Убираем суффикс и тег при изменении версии
     success4 = update_version_define('PROJECT_VERSION_SUFFIX', "")
     success5 = update_version_define('PROJECT_VERSION_TAG', "")
     
@@ -177,7 +166,6 @@ def update_build_number():
     except (ValueError, TypeError):
         new_build = "1"
     
-    # Обновляем номер сборки и дату
     success1 = update_version_define('PROJECT_BUILD', new_build)
     success2 = update_version_define('PROJECT_BUILD_NUM', new_build, False)
     success3 = update_build_date()
@@ -186,6 +174,23 @@ def update_build_number():
         print(f"✅ Build number updated: {info.get('build', 'N/A')} → {new_build}")
         return new_build
     return False
+
+def generate_snapshot_suffix():
+    """Генерирует уникальный суффикс для снапшотов на основе хэша коммита и времени"""
+    try:
+        # Пытаемся получить короткий хэш коммита
+        commit_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode().strip()
+        new_suffix = f"-SNAPSHOT.{commit_hash}"
+        new_tag = f"SNAPSHOT.{commit_hash}"
+        print(f"🔧 Using commit hash for snapshot: {commit_hash}")
+    except Exception as e:
+        # Fallback: используем timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M")
+        new_suffix = f"-SNAPSHOT.{timestamp}"
+        new_tag = f"SNAPSHOT.{timestamp}"
+        print(f"⚠️ Using timestamp for snapshot (git error: {e}): {timestamp}")
+    
+    return new_suffix, new_tag
 
 def update_version_suffix(suffix_type, number=""):
     info = get_current_version_info()
@@ -197,9 +202,11 @@ def update_version_suffix(suffix_type, number=""):
         new_tag = ""
             
     elif suffix_type == "snapshot":
-        # Простая нумерация снапшотов без файла
-        new_suffix = f"-SNAPSHOT.{number}" if number else "-SNAPSHOT"
-        new_tag = f"SNAPSHOT.{number}" if number else "SNAPSHOT"
+        if number == "auto":
+            new_suffix, new_tag = generate_snapshot_suffix()
+        else:
+            new_suffix = f"-SNAPSHOT.{number}" if number else "-SNAPSHOT"
+            new_tag = f"SNAPSHOT.{number}" if number else "SNAPSHOT"
         
     elif suffix_type in ["alpha", "beta", "rc", "hotfix"]:
         new_suffix = f"-{suffix_type}.{number}" if number else f"-{suffix_type}.1"
@@ -208,7 +215,6 @@ def update_version_suffix(suffix_type, number=""):
         new_suffix = info['suffix'] or ""
         new_tag = info.get('tag', '')
     
-    # Обновляем суффикс, тег и дату
     success1 = update_version_define('PROJECT_VERSION_SUFFIX', new_suffix)
     success2 = update_version_define('PROJECT_VERSION_TAG', new_tag)
     success3 = update_build_date()
@@ -300,10 +306,8 @@ def handle_command(args):
 
 if __name__ == "__main__":
     try:
-        # Проверяем существование файла
         if not os.path.exists(VERSION_FILE):
             print(f"❌ Version file not found: {VERSION_FILE}")
-            print("💡 Please create the file first or check the path")
             sys.exit(1)
         
         success = handle_command(sys.argv[1:])
