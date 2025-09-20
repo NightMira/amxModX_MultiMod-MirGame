@@ -136,13 +136,21 @@ jobs:
             
             if [[ "$VERSION_CMD" == *"&&"* ]]; then
               IFS='&&' read -r cmd1 cmd2 <<< "$VERSION_CMD"
-              python3 update_version.py $(echo $cmd1 | xargs)
-              python3 update_version.py $(echo $cmd2 | xargs)
+              # Используем конструкцию для игнорирования ошибок выхода
+              if ! python3 update_version.py $(echo $cmd1 | xargs); then
+                echo "⚠️ First command completed with non-zero exit code, but continuing..."
+              fi
+              if ! python3 update_version.py $(echo $cmd2 | xargs); then
+                echo "⚠️ Second command completed with non-zero exit code, but continuing..."
+              fi
             else
-              python3 update_version.py $VERSION_CMD
+              if ! python3 update_version.py $VERSION_CMD; then
+                echo "⚠️ Version update completed with non-zero exit code, but continuing..."
+              fi
             fi
           fi
           
+          # Всегда обновляем build number и git info
           python3 update_version.py build
           
           echo "📊 Final version information:"

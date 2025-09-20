@@ -289,7 +289,7 @@ def update_version_suffix(suffix_type, number=""):
     if success1 and success2 and success3 and success4:
         action = "removed" if not new_suffix else f"set to {new_suffix}"
         print(f"✅ Version suffix {action}")
-        return new_suffix
+        return True
     return False
 
 def handle_command(args):
