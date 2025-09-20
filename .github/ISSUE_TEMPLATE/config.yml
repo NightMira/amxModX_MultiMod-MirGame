@@ -1,8 +1,26 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/NightMira/amxModX_MultiMod-MirGame#readme
+    about: Check the README for setup and usage instructions
   - name: 🐛 Bug Reports
     url: https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/new?template=bug_report.md
-    about: Report a bug or compilation issue
-  - name: ✨ Feature Request
-    url: https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/new?template=bug_report.md
-    about: Feature Request
+    about: Report compilation errors or plugin bugs
+  - name: ✨ Feature Requests
+    url: https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/new?template=feature_request.md
+    about: Suggest new features or improvements
+  - name: 🏗️ Build Issues
+    url: https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/new?template=build_issue.md
+    about: Report CI/CD or compilation problems
+  - name: 📚 Documentation Issues
+    url: https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/new?template=docs_issue.md
+    about: Report documentation problems
+  - name: 🧪 Test Issues
+    url: https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/new?template=test_issue.md
+    about: Report testing problems
+  - name: 🔄 Workflow Issues
+    url: https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/new?template=workflow_issue.md
+    about: Report GitHub Actions problems
+  - name: 🏷️ Label Issues
+    url: https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/new?template=label_issue.md
+    about: Report auto-labeling problems
