@@ -22,6 +22,70 @@ def show_help():
     print("  get-suffix               Get version suffix")
     print("  get-full-version         Get full version with suffix")
 
+def get_git_info():
+    """Получает информацию о git коммите"""
+    git_info = {
+        'commit_hash': '',
+        'commit_short_hash': '',
+        'commit_author': '',
+        'commit_date': ''
+    }
+    
+    try:
+        # Полный хэш коммита
+        git_info['commit_hash'] = subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], 
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+        # Короткий хэш коммита (7 символов)
+        git_info['commit_short_hash'] = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+        # Автор коммита
+        git_info['commit_author'] = subprocess.check_output(
+            ['git', 'log', '-1', '--pretty=format:%an'],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+        # Дата коммита (в формате YYYY-MM-DD)
+        git_info['commit_date'] = subprocess.check_output(
+            ['git', 'log', '-1', '--pretty=format:%cd', '--date=short'],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+    except Exception as e:
+        print(f"⚠️ Could not get git info: {e}")
+        # Устанавливаем значения по умолчанию
+        git_info['commit_hash'] = 'unknown'
+        git_info['commit_short_hash'] = 'unknown'
+        git_info['commit_author'] = os.getenv('GITHUB_ACTOR', 'unknown')
+        git_info['commit_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
+    
+    return git_info
+
+def update_git_info():
+    """Обновляет информацию о git коммите в version.inc"""
+    git_info = get_git_info()
+    
+    success = True
+    success &= update_version_define('PROJECT_COMMIT_HASH', git_info['commit_hash'])
+    success &= update_version_define('PROJECT_COMMIT_SHORT_HASH', git_info['commit_short_hash'])
+    success &= update_version_define('PROJECT_COMMIT_AUTHOR', git_info['commit_author'])
+    success &= update_version_define('PROJECT_COMMIT_DATE', git_info['commit_date'])
+    
+    if success:
+        print("✅ Git commit information updated")
+        print(f"   Hash: {git_info['commit_short_hash']}")
+        print(f"   Author: {git_info['commit_author']}")
+        print(f"   Date: {git_info['commit_date']}")
+    else:
+        print("❌ Failed to update git commit information")
+    
+    return success
+
 def get_current_version_info():
     if not os.path.exists(VERSION_FILE):
         return None
@@ -147,8 +211,9 @@ def increment_version(version_type):
     success3 = update_build_date()
     success4 = update_version_define('PROJECT_VERSION_SUFFIX', "")
     success5 = update_version_define('PROJECT_VERSION_TAG', "")
+    success6 = update_git_info()  # ← ДОБАВЛЕНО ОБНОВЛЕНИЕ GIT INFO
     
-    if success1 and success2 and success3 and success4 and success5:
+    if success1 and success2 and success3 and success4 and success5 and success6:
         print(f"✅ Version updated successfully to {new_version}")
         return True
     else:
@@ -169,8 +234,9 @@ def update_build_number():
     success1 = update_version_define('PROJECT_BUILD', new_build)
     success2 = update_version_define('PROJECT_BUILD_NUM', new_build, False)
     success3 = update_build_date()
+    success4 = update_git_info()  # ← ДОБАВЛЕНО ОБНОВЛЕНИЕ GIT INFO
     
-    if success1 and success2 and success3:
+    if success1 and success2 and success3 and success4:
         print(f"✅ Build number updated: {info.get('build', 'N/A')} → {new_build}")
         return new_build
     return False
@@ -218,8 +284,9 @@ def update_version_suffix(suffix_type, number=""):
     success1 = update_version_define('PROJECT_VERSION_SUFFIX', new_suffix)
     success2 = update_version_define('PROJECT_VERSION_TAG', new_tag)
     success3 = update_build_date()
+    success4 = update_git_info()  # ← ДОБАВЛЕНО ОБНОВЛЕНИЕ GIT INFO
     
-    if success1 and success2 and success3:
+    if success1 and success2 and success3 and success4:
         action = "removed" if not new_suffix else f"set to {new_suffix}"
         print(f"✅ Version suffix {action}")
         return new_suffix
@@ -246,7 +313,9 @@ def handle_command(args):
             print(f"   Suffix: '{info['suffix'] or ''}'")
             print(f"   Tag: '{info.get('tag', 'N/A')}'")
         return True
-        
+    elif command in ['git-info', '-gi']:
+        return update_git_info()
+    
     elif command in ['major', '--major']:
         return increment_version("major")
         
