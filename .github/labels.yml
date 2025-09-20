@@ -3,12 +3,12 @@
   color: "d73a4a"
   description: "Ошибки компиляции или баги в плагинах"
 
-- name: "type-feature"  
+- name: "type-feature"
   color: "a2eeef"
   description: "Новые функции плагинов"
 
 - name: "type-refactor"
-  color: "d4c5f9" 
+  color: "d4c5f9"
   description: "Рефакторинг кода"
 
 - name: "type-build"
@@ -33,7 +33,7 @@
   description: "Высокий приоритет - важные функции"
 
 - name: "priority-medium"
-  color: "0e8a16" 
+  color: "0e8a16"
   description: "Средний приоритет - обычная разработка"
 
 - name: "priority-low"
@@ -72,7 +72,7 @@
 
 - name: "stage-beta"
   color: "5319e7"
-  description: "Бета-тестирование" 
+  description: "Бета-тестирование"
 
 - name: "stage-rc"
   color: "5319e7"

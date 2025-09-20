@@ -23,20 +23,20 @@
 #define PROJECT_VERSION_NUM 5
 
 // Version Suffix (Pre-release tags)
-#define PROJECT_VERSION_TAG "SNAPSHOT.b9f6629"
-#define PROJECT_VERSION_SUFFIX "-SNAPSHOT.b9f6629"
+#define PROJECT_VERSION_TAG "SNAPSHOT.8076c03"
+#define PROJECT_VERSION_SUFFIX "-SNAPSHOT.8076c03"
 
 // Build Information
-#define PROJECT_BUILD "127"
-#define PROJECT_BUILD_NUM 127
+#define PROJECT_BUILD "128"
+#define PROJECT_BUILD_NUM 128
 #define PROJECT_BUILD_DATE "2025-09-20"
 #define PROJECT_BUILD_TIME          __TIME__
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
 // Git Commit Information
-#define PROJECT_COMMIT_HASH "b9f662921bddefe4d0b05da8d8f86308ddc680df"
-#define PROJECT_COMMIT_SHORT_HASH "b9f6629"
-#define PROJECT_COMMIT_AUTHOR "NightMira"
+#define PROJECT_COMMIT_HASH "8076c0367c1322b84528320f709753c77116d4e6"
+#define PROJECT_COMMIT_SHORT_HASH "8076c03"
+#define PROJECT_COMMIT_AUTHOR "MirGame"
 #define PROJECT_COMMIT_DATE "2025-09-20"
 
 /* ========================================================================== */
