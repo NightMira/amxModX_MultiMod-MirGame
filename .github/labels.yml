@@ -1,27 +1,29 @@
-- name: "bug"
+# ==================== 🎯 TASK TYPES ====================
+- name: "type-bug"
   color: "d73a4a"
   description: "Ошибки компиляции или баги в плагинах"
 
-- name: "feature"
+- name: "type-feature"  
   color: "a2eeef"
   description: "Новые функции плагинов"
 
-- name: "refactor"
-  color: "d4c5f9"
+- name: "type-refactor"
+  color: "d4c5f9" 
   description: "Рефакторинг кода"
 
-- name: "build"
+- name: "type-build"
   color: "0075ca"
   description: "Задачи сборки и CI/CD"
 
-- name: "docs"
+- name: "type-docs"
   color: "0075ca"
   description: "Документация"
 
-- name: "test"
+- name: "type-test"
   color: "d93f0b"
   description: "Тестирование"
 
+# ==================== ⚡ PRIORITIES ====================
 - name: "priority-critical"
   color: "b60205"
   description: "Критический приоритет - блокирует разработку"
@@ -31,13 +33,14 @@
   description: "Высокий приоритет - важные функции"
 
 - name: "priority-medium"
-  color: "0e8a16"
+  color: "0e8a16" 
   description: "Средний приоритет - обычная разработка"
 
 - name: "priority-low"
   color: "ededed"
   description: "Низкий приоритет - улучшения"
 
+# ==================== 🧩 COMPONENTS ====================
 - name: "component-compiler"
   color: "bfdadc"
   description: "Связано с AMXX компилятором"
@@ -54,18 +57,11 @@
   color: "0075ca"
   description: "Связано с документацией"
 
-- name: "version-major"
+- name: "component-versioning"
   color: "fbca04"
-  description: "Мажорное изменение версии (X.0.0)"
+  description: "Связано с системой версионирования"
 
-- name: "version-minor"
-  color: "fbca04"
-  description: "Минорное изменение версии (0.Y.0)"
-
-- name: "version-patch"
-  color: "fbca04"
-  description: "Патч версии (0.0.Z)"
-
+# ==================== 🚀 RELEASE STAGES ====================
 - name: "stage-dev"
   color: "5319e7"
   description: "Разработка в dev ветке"
@@ -76,7 +72,7 @@
 
 - name: "stage-beta"
   color: "5319e7"
-  description: "Бета-тестирование"
+  description: "Бета-тестирование" 
 
 - name: "stage-rc"
   color: "5319e7"
@@ -89,3 +85,33 @@
 - name: "stage-hotfix"
   color: "5319e7"
   description: "Экстренный хотфикс"
+
+# ==================== 📊 VERSIONING ====================
+- name: "version-major"
+  color: "fbca04"
+  description: "Мажорное изменение версии (X.0.0)"
+
+- name: "version-minor"
+  color: "fbca04"
+  description: "Минорное изменение версии (0.Y.0)"
+
+- name: "version-patch"
+  color: "fbca04"
+  description: "Патч версии (0.0.Z)"
+
+# ==================== 🔄 WORKFLOW ====================
+- name: "workflow-auto"
+  color: "006b75"
+  description: "Автоматически назначенная метка"
+
+- name: "workflow-needs-review"
+  color: "fbca04"
+  description: "Требует ревью"
+
+- name: "workflow-in-progress"
+  color: "0052cc"
+  description: "В процессе работы"
+
+- name: "workflow-completed"
+  color: "0e8a16"
+  description: "Завершено"
