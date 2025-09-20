@@ -1,50 +1,46 @@
 # Changelog
 
-## [0.0.1] - 2025-09-05
+All notable changes to this project will be documented in this file.
 
-### 🚀 Added
-- **Complete build system** for AMXX plugins compilation
-- **Centralized configuration** in `config.sh` with path management
-- **Version management system** with `update_version.py` script:
-  - Semantic versioning with pre-releases (alpha, beta, rc)
-  - Automatic build number increment
-  - Branch-based suffix detection
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### 📊 Enhanced
-- **Plugin validation** for required defines (PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
-- **Detailed compilation reporting** with color-coded status table
-- **Comprehensive logging** to `compile.log` with timestamps
-- **Statistics tracking** (successful/warnings/errors counts)
+## [Unreleased]
+### Added
+- Полная система шаблонов issues (8 категорий)
+- Автоматическая ретроактивная проверка существующих issues/PR
+- Git commit информация в version.inc
+- Поддержка автоматической нумерации снапшотов
 
-### 🤖 Automated
-- **CI/CD pipeline** with GitHub Actions:
-  - Automatic branch-based version suffixes:
-    - `main` → release (1.0.0)
-    - `develop` → alpha.1 (1.0.0-alpha.1)
-    - `pre-release/alpha/*` → alpha.X
-    - `pre-release/beta/*` → beta.X  
-    - `pre-release/rc/*` → rc.X
-  - Artifact upload with suffix naming
-  - 32-bit library dependencies installation
+### Changed
+- Улучшена система автоматического назначения меток
+- Переработана структура меток (type-, priority-, component-)
+- Обновлена логика определения веток для merge-коммитов
+- Улучшено распознавание PROJECT_AUTHOR в плагинах
 
-### 🛡️ Reliability
-- **Error handling** for compiler failures
-- **Timeout protection** (30s per plugin)
-- **Fallback mechanisms** for missing components
-- **Requirements checking** before compilation
+### Fixed
+- Исправление обработки merge-веток в CI/CD
+- Корректное определение авторства плагинов
+- Оптимизация работы с GitHub API
 
-### 🎯 Usage
-``` bash
-# Compile all plugins
-./compile.sh
+## [0.0.5] - 2025-09-20
+### Added
+- Поддержка SemVer с автоматическими снапшотами
+- Система автоматического назначения меток
+- GitHub Actions для CI/CD
+- Интеграция с GitHub Projects
 
-# Version management
-python3 update_version.py info      # Show current version
-python3 update_version.py build     # Increment build number
-python3 update_version.py alpha 1   # Set alpha release
-python3 update_version.py release   # Final release
-```
-## [0.1.0] - 2025-09-07
+### Changed
+- Обновлена структура проекта
+- Улучшена система версионирования
+- Оптимизированы скрипты сборки
+
+### Fixed
+- Баги компиляции плагинов
+- Проблемы с путями в config.sh
+- Обработка ошибок в скриптах
+
+## [0.0.4] - 2025-09-07
 ### **🚀 Initial Release: Complete AMXX Build System**
 **📦 Core System Architecture**
 - **Полная система сборки** AMXX плагинов с SemVer версионированием
@@ -143,7 +139,7 @@ python3 update_version.py build      # Инкремент сборки
 gh issue create --title "Ошибка компиляции" --label "bug,priority-high"
 ```
 
-## Версия 0.0.3 → 0.0.4
+## Версия 0.0.3
 **Дата:** 16 сентября 2025
 **Тип релиза:** Патч (bug fixes и улучшения)
 
@@ -153,7 +149,7 @@ gh issue create --title "Ошибка компиляции" --label "bug,priorit
 - **Логирование:** Детальные отчеты о сборке в GitHub Actions
 
 ### 🐛 Исправления ошибок
-- **Версионный файл:** Исправлены числовые значения версий (0.1.0 → 0.0.4)
+- **Версионный файл:** Исправлены числовые значения версий (0.1.0 → 0.0.3)
 - **Метки проекта:** Исправлено добавление в проекты организации NightMira
 - **Обработка ошибок:** Улучшена обработка отсутствующих меток и конфигураций
 
@@ -178,3 +174,48 @@ gh issue create --title "Ошибка компиляции" --label "bug,priorit
 - **Добавлено строк:** 257
 - **Удалено строк:** 153
 - **Нет кардинальных изменений**
+
+## [0.0.1] - 2025-09-05
+
+### 🚀 Added
+- **Complete build system** for AMXX plugins compilation
+- **Centralized configuration** in `config.sh` with path management
+- **Version management system** with `update_version.py` script:
+  - Semantic versioning with pre-releases (alpha, beta, rc)
+  - Automatic build number increment
+  - Branch-based suffix detection
+
+### 📊 Enhanced
+- **Plugin validation** for required defines (PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
+- **Detailed compilation reporting** with color-coded status table
+- **Comprehensive logging** to `compile.log` with timestamps
+- **Statistics tracking** (successful/warnings/errors counts)
+
+### 🤖 Automated
+- **CI/CD pipeline** with GitHub Actions:
+  - Automatic branch-based version suffixes:
+    - `main` → release (1.0.0)
+    - `develop` → alpha.1 (1.0.0-alpha.1)
+    - `pre-release/alpha/*` → alpha.X
+    - `pre-release/beta/*` → beta.X  
+    - `pre-release/rc/*` → rc.X
+  - Artifact upload with suffix naming
+  - 32-bit library dependencies installation
+
+### 🛡️ Reliability
+- **Error handling** for compiler failures
+- **Timeout protection** (30s per plugin)
+- **Fallback mechanisms** for missing components
+- **Requirements checking** before compilation
+
+### 🎯 Usage
+``` bash
+# Compile all plugins
+./compile.sh
+
+# Version management
+python3 update_version.py info      # Show current version
+python3 update_version.py build     # Increment build number
+python3 update_version.py alpha 1   # Set alpha release
+python3 update_version.py release   # Final release
+```
