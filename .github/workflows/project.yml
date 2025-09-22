@@ -213,14 +213,14 @@ jobs:
           gh issue list --state open --limit 30 --json number,title,url | jq -c '.[]' | while read item; do
             number=$(echo "$item" | jq -r '.number')
             url=$(echo "$item" | jq -r '.url')
-            gh project item-add 3 --user NightMira --url "$url" 2>/dev/null && echo "✅ Issue #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ Issue #$number" >> $GITHUB_STEP_SUMMARY
+            gh project item-add 3 --owner NightMira --url "$url" 2>/dev/null && echo "✅ Issue #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ Issue #$number" >> $GITHUB_STEP_SUMMARY
           done
           
           # Синхронизация PR
           gh pr list --state open --limit 30 --json number,title,url | jq -c '.[]' | while read item; do
             number=$(echo "$item" | jq -r '.number')
             url=$(echo "$item" | jq -r '.url')
-            gh project item-add 3 --user NightMira --url "$url" 2>/dev/null && echo "✅ PR #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ PR #$number" >> $GITHUB_STEP_SUMMARY
+            gh project item-add 3 --owner NightMira --url "$url" 2>/dev/null && echo "✅ PR #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ PR #$number" >> $GITHUB_STEP_SUMMARY
           done
           
           echo "✅ Manual sync completed!" >> $GITHUB_STEP_SUMMARY
