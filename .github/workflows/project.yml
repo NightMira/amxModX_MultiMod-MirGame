@@ -41,7 +41,7 @@ jobs:
         run: |
           echo "## 🗂️ Project Automation" >> $GITHUB_STEP_SUMMARY
           
-          # Получаем данные проекта
+          # ИСПРАВЛЕНО: используем -F для числовых переменных
           gh api graphql -f query='
             query($user: String!, $number: Int!) {
               user(login: $user) {
@@ -66,7 +66,7 @@ jobs:
                   }
                 }
               }
-            }' -f user=$USER -f number=$PROJECT_NUMBER > project_data.json
+            }' -f user="$USER" -F number="$PROJECT_NUMBER" > project_data.json
 
           echo 'PROJECT_ID='$(jq '.data.user.projectV2.id' project_data.json) >> $GITHUB_ENV
           echo 'PROJECT_TITLE='$(jq -r '.data.user.projectV2.title' project_data.json) >> $GITHUB_ENV
@@ -78,6 +78,8 @@ jobs:
             echo 'TODO_OPTION_ID='$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") | .id' project_data.json) >> $GITHUB_ENV
             echo 'DONE_OPTION_ID='$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Done") | .id' project_data.json) >> $GITHUB_ENV
           fi
+
+          echo "📊 Project: $PROJECT_TITLE" >> $GITHUB_STEP_SUMMARY
 
       - name: ➕ Add item to project (new items)
         if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
@@ -96,6 +98,7 @@ jobs:
 
           echo "🎯 Adding $ITEM_TYPE #$ITEM_NUMBER to project..." >> $GITHUB_STEP_SUMMARY
 
+          # ИСПРАВЛЕНО: правильные флаги для переменных
           item_id=$(gh api graphql -f query='
             mutation($project:ID!, $content:ID!) {
               addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
@@ -103,7 +106,7 @@ jobs:
                   id
                 }
               }
-            }' -f project=$PROJECT_ID -f content=$CONTENT_ID --jq '.data.addProjectV2ItemById.item.id')
+            }' -f project="$PROJECT_ID" -f content="$CONTENT_ID" --jq '.data.addProjectV2ItemById.item.id')
 
           echo 'ITEM_ID='$item_id >> $GITHUB_ENV
           echo "✅ Added to project!" >> $GITHUB_STEP_SUMMARY
@@ -125,7 +128,7 @@ jobs:
             ITEM_NUMBER=${{ github.event.pull_request.number }}
           fi
 
-          # Находим item в проекте
+          # ИСПРАВЛЕНО: правильные флаги
           ITEM_ID=$(gh api graphql -f query='
             query($project: ID!, $content: ID!) {
               node(id: $project) {
@@ -145,7 +148,7 @@ jobs:
                   }
                 }
               }
-            }' -f project=$PROJECT_ID -f content=$CONTENT_ID \
+            }' -f project="$PROJECT_ID" -f content="$CONTENT_ID" \
             --jq '.data.node.items.nodes[] | select(.content.id == $content) | .id')
 
           if [ -n "$ITEM_ID" ] && [ -n "$STATUS_FIELD_ID" ] && [ -n "$DONE_OPTION_ID" ]; then
@@ -163,7 +166,7 @@ jobs:
                     id
                   }
                 }
-              }' -f project=$PROJECT_ID -f item=$ITEM_ID -f field=$STATUS_FIELD_ID -f value=$DONE_OPTION_ID --silent
+              }' -f project="$PROJECT_ID" -f item="$ITEM_ID" -f field="$STATUS_FIELD_ID" -f value="$DONE_OPTION_ID" --silent
             
             echo "✅ Status updated to Done" >> $GITHUB_STEP_SUMMARY
           else
@@ -179,6 +182,7 @@ jobs:
           echo "DATE=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
           
           if [ -n "$STATUS_FIELD_ID" ] && [ -n "$TODO_OPTION_ID" ]; then
+            # ИСПРАВЛЕНО: правильные флаги
             gh api graphql -f query='
               mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
                 updateProjectV2ItemFieldValue(input: {
@@ -193,7 +197,7 @@ jobs:
                     id
                   }
                 }
-              }' -f project=$PROJECT_ID -f item=$ITEM_ID -f field=$STATUS_FIELD_ID -f value=$TODO_OPTION_ID --silent
+              }' -f project="$PROJECT_ID" -f item="$ITEM_ID" -f field="$STATUS_FIELD_ID" -f value="$TODO_OPTION_ID" --silent
             echo "✅ Status set to Todo" >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -205,7 +209,7 @@ jobs:
           echo "### 🔍 Manual Sync" >> $GITHUB_STEP_SUMMARY
           echo "📦 Syncing all open items..." >> $GITHUB_STEP_SUMMARY
           
-          # Синхронизация issues
+          # Синхронизация issues (простой способ через gh cli)
           gh issue list --state open --limit 30 --json number,title,url | jq -c '.[]' | while read item; do
             number=$(echo "$item" | jq -r '.number')
             url=$(echo "$item" | jq -r '.url')
