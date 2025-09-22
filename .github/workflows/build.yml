@@ -1,293 +1,215 @@
-name: Project Automation (GitHub CLI)
+name: AMXX Build System
 
 on:
-  issues:
-    types: [opened, reopened, closed, labeled]
+  push:
+    branches: [main, dev, pre-release/alpha/*, pre-release/beta/*, pre-release/rc/*, hotfix/*]
   pull_request:
-    types: [opened, reopened, closed, ready_for_review, labeled]
+    branches: [main, dev]
+  release:
+    types: [published]
   workflow_dispatch:
-    inputs:
-      sync_all:
-        description: 'Sync all open issues/PRs to project'
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
-
-env:
-  PROJECT_NUMBER: 3
-  PROJECT_OWNER: NightMira
 
 jobs:
-  project-automation:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Checkout code
+      - name: 🚀 Checkout code (with full history)
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          fetch-depth: 0  # Важно: получаем полную историю
 
-      - name: 📦 Setup GitHub CLI
+      - name: 📦 Install system dependencies
         run: |
-          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update
-          sudo apt install gh -y
+          sudo apt-get update
+          sudo apt-get install -y libc6-i386 lib32stdc++6 lib32z1 lib32gcc-s1 wget tar
 
-      - name: 🔑 Authenticate GitHub CLI
+      - name: 🔧 Download AMXX Compiler
         run: |
-          echo "${{ secrets.PRIVATE_REPO_TOKEN }}" | gh auth login --with-token
-          gh auth status
+          wget -q https://github.com/NightMira/amxmodx_1-9/releases/download/v1.9/amxmodx19.tar
+          tar -xf amxmodx19.tar
+          chmod +x amxxpc
+          ./amxxpc --help || true
 
-      - name: 📋 Process project items (GitHub CLI)
-        env:
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+      - name: 🏷️ Determine version based on branch (FIXED for merge)
         run: |
-          echo "## 🗂️ Project Automation Summary (GitHub CLI)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Определяем тип события и данные
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            ITEM_TYPE="issue"
-            ITEM_NUMBER=${{ github.event.issue.number }}
-            ITEM_TITLE="${{ github.event.issue.title }}"
-            ITEM_ACTION="${{ github.event.action }}"
-            ITEM_URL="${{ github.event.issue.html_url }}"
+          # Улучшенное определение ветки для merge-коммитов
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Для PR используем базовую ветку
+            BRANCH_NAME="${{ github.base_ref }}"
+            echo "📋 PR detected, using base ref: $BRANCH_NAME"
           else
-            ITEM_TYPE="pull request"
-            ITEM_NUMBER=${{ github.event.pull_request.number }}
-            ITEM_TITLE="${{ github.event.pull_request.title }}"
-            ITEM_ACTION="${{ github.event.action }}"
-            ITEM_URL="${{ github.event.pull_request.html_url }}"
-          fi
-
-          echo "### 📝 $ITEM_TYPE Processing" >> $GITHUB_STEP_SUMMARY
-          echo "- **$ITEM_TYPE:** #$ITEM_NUMBER" >> $GITHUB_STEP_SUMMARY
-          echo "- **Title:** $ITEM_TITLE" >> $GITHUB_STEP_SUMMARY
-          echo "- **Action:** $ITEM_ACTION" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** $ITEM_URL" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-      - name: 🎯 Add item to project (GraphQL)
-        if: github.event_name == 'issues' && github.event.action == 'opened' || github.event_name == 'pull_request' && github.event.action == 'opened'
-        env:
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        run: |
-          echo "### 🎯 Adding to Project via GraphQL" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            ITEM_ID="${{ github.event.issue.node_id }}"
-            ITEM_NUMBER=${{ github.event.issue.number }}
-          else
-            ITEM_ID="${{ github.event.pull_request.node_id }}"
-            ITEM_NUMBER=${{ github.event.pull_request.number }}
-          fi
-
-          # GraphQL запрос для получения ID проекта
-          PROJECT_ID=$(gh api graphql -f query='
-            query($owner: String!, $number: Int!) {
-              organization(login: $owner) {
-                projectV2(number: $number) {
-                  id
-                  title
-                }
-              }
-            }' -f owner="$PROJECT_OWNER" -f number="$PROJECT_NUMBER" --jq '.data.organization.projectV2.id')
-
-          if [ -n "$PROJECT_ID" ]; then
-            echo "📊 Project ID: $PROJECT_ID" >> $GITHUB_STEP_SUMMARY
+            # Для push получаем ветку из ref
+            BRANCH_NAME="${GITHUB_REF#refs/heads/}"
             
-            # Добавляем элемент в проект
-            ADD_RESULT=$(gh api graphql -f query='
-              mutation($project: ID!, $item: ID!) {
-                addProjectV2ItemById(input: {projectId: $project, contentId: $item}) {
-                  item {
-                    id
-                  }
-                }
-              }' -f project="$PROJECT_ID" -f item="$ITEM_ID")
-
-            if echo "$ADD_RESULT" | grep -q "addProjectV2ItemById"; then
-              echo "✅ Successfully added to project!" >> $GITHUB_STEP_SUMMARY
-              
-              # Получаем информацию о добавленном элементе
-              ITEM_INFO=$(gh api graphql -f query='
-                query($project: ID!, $item: ID!) {
-                  node(id: $item) {
-                    ... on Issue {
-                      title
-                      state
-                      labels(first: 10) {
-                        nodes {
-                          name
-                        }
-                      }
-                    }
-                    ... on PullRequest {
-                      title
-                      state
-                      labels(first: 10) {
-                        nodes {
-                          name
-                        }
-                      }
-                    }
-                  }
-                }' -f project="$PROJECT_ID" -f item="$ITEM_ID")
-              
-              echo "📋 Item details added to project." >> $GITHUB_STEP_SUMMARY
-            else
-              echo "❌ Failed to add to project" >> $GITHUB_STEP_SUMMARY
-              echo "Response: $ADD_RESULT" >> $GITHUB_STEP_SUMMARY
+            # Если это тег, используем main
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              BRANCH_NAME="main"
+              echo "📋 Tag detected, using branch: main"
             fi
-          else
-            echo "❌ Could not find project $PROJECT_NUMBER in organization $PROJECT_OWNER" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: 🔄 Update item status (GraphQL)
-        if: github.event.action == 'closed' || github.event.action == 'reopened'
-        env:
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        run: |
-          echo "### 🔄 Updating Item Status" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            ITEM_ID="${{ github.event.issue.node_id }}"
-            ITEM_STATE="${{ github.event.issue.state }}"
-          else
-            ITEM_ID="${{ github.event.pull_request.node_id }}"
-            ITEM_STATE="${{ github.event.pull_request.state }}"
-          fi
-
-          # Находим проект и элемент в проекте
-          PROJECT_ITEM_ID=$(gh api graphql -f query='
-            query($owner: String!, $projectNumber: Int!, $itemId: ID!) {
-              organization(login: $owner) {
-                projectV2(number: $projectNumber) {
-                  id
-                  items(first: 100) {
-                    nodes {
-                      id
-                      content {
-                        ... on Issue {
-                          id
-                        }
-                        ... on PullRequest {
-                          id
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }' -f owner="$PROJECT_OWNER" -f projectNumber="$PROJECT_NUMBER" -f itemId="$ITEM_ID" \
-            --jq '.data.organization.projectV2.items.nodes[] | select(.content.id == $itemId) | .id')
-
-          if [ -n "$PROJECT_ITEM_ID" ]; then
-            echo "📋 Updating status for project item: $PROJECT_ITEM_ID" >> $GITHUB_STEP_SUMMARY
             
-            # Обновляем статус (нужно получить ID поля статуса)
-            FIELD_ID=$(gh api graphql -f query='
-              query($project: ID!) {
-                node(id: $project) {
-                  ... on ProjectV2 {
-                    field(name: "Status") {
-                      ... on ProjectV2SingleSelectField {
-                        id
-                        options {
-                          id
-                          name
-                        }
-                      }
-                    }
-                  }
-                }
-              }' -f project="$PROJECT_ID" --jq '.data.node.field.id')
-            
-            if [ -n "$FIELD_ID" ]; then
-              # Обновляем статус элемента
-              UPDATE_RESULT=$(gh api graphql -f query='
-                mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
-                  updateProjectV2ItemFieldValue(input: {
-                    projectId: $project
-                    itemId: $item
-                    fieldId: $field
-                    value: {
-                      singleSelectOptionId: $value
-                    }
-                  }) {
-                    projectV2Item {
-                      id
-                    }
-                  }
-                }' -f project="$PROJECT_ID" -f item="$PROJECT_ITEM_ID" -f field="$FIELD_ID" -f value="$ITEM_STATE")
+            # Обработка merge-коммитов
+            if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "merge" ] || [[ "$BRANCH_NAME" == *"/merge" ]]; then
+              echo "⚠️ Merge commit detected, detecting target branch..."
               
-              echo "✅ Status updated to: $ITEM_STATE" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "⚠️ Could not find Status field in project" >> $GITHUB_STEP_SUMMARY
+              # Метод 1: из сообщения коммита
+              BRANCH_NAME=$(git log -1 --pretty=%B | grep -o 'Merge branch.*into' | awk '{print $3}' || echo "")
+              
+              # Метод 2: альтернативный формат
+              if [ -z "$BRANCH_NAME" ]; then
+                BRANCH_NAME=$(git log -1 --pretty=%B | grep -o 'from.*' | cut -d' ' -f2 || echo "")
+              fi
+              
+              # Метод 3: из remote веток
+              if [ -z "$BRANCH_NAME" ]; then
+                BRANCH_NAME=$(git branch -r --contains HEAD | grep -v "HEAD" | head -1 | sed 's/origin\///' | xargs)
+              fi
+              
+              # Метод 4: fallback на dev
+              if [ -z "$BRANCH_NAME" ]; then
+                BRANCH_NAME="dev"
+                echo "⚠️ Could not detect branch, using fallback: dev"
+              else
+                echo "📋 Detected target branch from merge: $BRANCH_NAME"
+              fi
             fi
-          else
-            echo "⚠️ Item not found in project, may need manual addition" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          # Очистка имени ветки
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/^refs\/heads\///' | sed 's/^origin\///')
+          echo "📋 Final branch name: $BRANCH_NAME"
+          
+          CURRENT_VERSION=$(python3 update_version.py get-version)
+          CURRENT_SUFFIX=$(python3 update_version.py get-suffix)
+          
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            echo "VERSION_STRATEGY=release" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=stable" >> $GITHUB_ENV
+            echo "VERSION_CMD=release" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" == "dev" ]]; then
+            echo "VERSION_STRATEGY=snapshot" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=dev" >> $GITHUB_ENV
+            echo "VERSION_CMD=snapshot auto" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" =~ ^pre-release/alpha/ ]]; then
+            ALPHA_NUM="${BRANCH_NAME##*/}"
+            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=alpha-$ALPHA_NUM" >> $GITHUB_ENV
+            echo "VERSION_CMD=alpha $ALPHA_NUM" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" =~ ^pre-release/beta/ ]]; then
+            BETA_NUM="${BRANCH_NAME##*/}"
+            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=beta-$BETA_NUM" >> $GITHUB_ENV
+            echo "VERSION_CMD=beta $BETA_NUM" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" =~ ^pre-release/rc/ ]]; then
+            RC_NUM="${BRANCH_NAME##*/}"
+            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=rc-$RC_NUM" >> $GITHUB_ENV
+            echo "VERSION_CMD=rc $RC_NUM" >> $GITHUB_ENV
+            
+          elif [[ "$BRANCH_NAME" =~ ^hotfix/ ]]; then
+            HOTFIX_NUM=$(echo "$BRANCH_NAME" | grep -o '[0-9]*$' || echo "1")
+            echo "VERSION_STRATEGY=hotfix" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=hotfix-$HOTFIX_NUM" >> $GITHUB_ENV
+            echo "VERSION_CMD=patch && hotfix $HOTFIX_NUM" >> $GITHUB_ENV
+            
+          else
+            echo "VERSION_STRATEGY=keep" >> $GITHUB_ENV
+            echo "ARTIFACT_SUFFIX=feature" >> $GITHUB_ENV
+            echo "VERSION_CMD=" >> $GITHUB_ENV
+          fi
+          
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "COMMIT_HASH=${{ github.sha }}" >> $GITHUB_ENV
+          echo "COMMIT_AUTHOR=${{ github.actor }}" >> $GITHUB_ENV
 
-      - name: 🔍 Sync all open items (Manual trigger)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.sync_all == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+      - name: 🏗️ Update version information
         run: |
-          echo "### 🔍 Syncing All Open Items to Project" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$VERSION_CMD" ]; then
+            echo "🔧 Executing: $VERSION_CMD"
+            
+            if [[ "$VERSION_CMD" == *"&&"* ]]; then
+              IFS='&&' read -r cmd1 cmd2 <<< "$VERSION_CMD"
+              # Используем конструкцию для игнорирования ошибок выхода
+              if ! python3 update_version.py $(echo $cmd1 | xargs); then
+                echo "⚠️ First command completed with non-zero exit code, but continuing..."
+              fi
+              if ! python3 update_version.py $(echo $cmd2 | xargs); then
+                echo "⚠️ Second command completed with non-zero exit code, but continuing..."
+              fi
+            else
+              if ! python3 update_version.py $VERSION_CMD; then
+                echo "⚠️ Version update completed with non-zero exit code, but continuing..."
+              fi
+            fi
+          fi
           
-          # Получаем ID проекта
-          PROJECT_ID=$(gh api graphql -f query='
-            query($owner: String!, $number: Int!) {
-              organization(login: $owner) {
-                projectV2(number: $number) {
-                  id
-                  title
-                }
-              }
-            }' -f owner="$PROJECT_OWNER" -f number="$PROJECT_NUMBER" --jq '.data.organization.projectV2.id')
+          # Всегда обновляем build number и git info
+          python3 update_version.py build
           
-          echo "📊 Syncing to project: $PROJECT_ID" >> $GITHUB_STEP_SUMMARY
-          
-          # Синхронизируем открытые issues
-          echo "📦 Syncing open issues..." >> $GITHUB_STEP_SUMMARY
-          ISSUES=$(gh api graphql -f query='
-            query($owner: String!, $repo: String!) {
-              repository(owner: $owner, name: $repo) {
-                issues(first: 100, states: OPEN) {
-                  nodes {
-                    id
-                    number
-                    title
-                  }
-                }
-              }
-            }' -f owner="$PROJECT_OWNER" -f repo="${{ github.repository }}")
-          
-          # Обрабатываем каждую issue
-          # (реализация массового добавления будет сложнее, здесь упрощенная версия)
-          echo "✅ Sync completed for open items" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Final version information:"
+          python3 update_version.py info
 
-      - name: 📊 Create final summary
+      - name: 🏗️ Compile all plugins
         run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 Workflow Information" >> $GITHUB_STEP_SUMMARY
+          mkdir -p compiled
+          chmod +x compile.sh
+          ./compile.sh
+
+      - name: 📦 Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: amxx-plugins-${{ env.ARTIFACT_SUFFIX }}-${{ github.run_number }}
+          path: |
+            compiled/*.amxx
+            compile.log
+            scripting/include/version.inc
+          retention-days: 30
+
+      - name: 📋 Create build summary
+        run: |
+          FULL_VERSION=$(python3 update_version.py get-full-version)
+          BUILD_INFO=$(python3 update_version.py info)
+          COMPILE_RESULT=$(tail -10 compile.log | grep -E "✅|❌|⚠️" || echo "No compilation results found")
+          
+          echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Build Information" >> $GITHUB_STEP_SUMMARY
           echo "- **Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Project:** $PROJECT_OWNER/Project#$PROJECT_NUMBER" >> $GITHUB_STEP_SUMMARY
-          echo "- **Timestamp:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ env.BRANCH_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Strategy:** ${{ env.VERSION_STRATEGY }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact:** amxx-plugins-${{ env.ARTIFACT_SUFFIX }}-${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "*Automatically processed by GitHub Actions with GitHub CLI*" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📋 Version Details" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "$BUILD_INFO" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🔧 Compilation Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$COMPILE_RESULT" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "Download the compiled plugins from the Artifacts section." >> $GITHUB_STEP_SUMMARY
+          
+          # Добавляем информацию о merge-детекции
+          if [[ "${{ env.BRANCH_NAME }}" == *"merge"* ]] || [[ "$GITHUB_REF" == *"merge"* ]]; then
+            echo "### 🔍 Merge Commit Handling" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Successfully detected target branch for merge commit" >> $GITHUB_STEP_SUMMARY
+          fi
 
-      - name: 🧹 Cleanup GitHub CLI auth
-        if: always()
-        run: |
-          gh auth logout || true
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
