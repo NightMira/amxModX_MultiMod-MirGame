@@ -1,13 +1,20 @@
-name: Add to Project
+name: Project Automation
 
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened, reopened, closed]
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, closed, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      sync_all:
+        description: 'Sync all open issues/PRs to project'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
-  add_to_project:
+  project_automation:
     runs-on: ubuntu-latest
     steps:
       - name: 🚀 Checkout code
@@ -34,7 +41,7 @@ jobs:
         run: |
           echo "## 🗂️ Project Automation" >> $GITHUB_STEP_SUMMARY
           
-          # Получаем данные пользовательского проекта
+          # Получаем данные проекта
           gh api graphql -f query='
             query($user: String!, $number: Int!) {
               user(login: $user) {
@@ -61,44 +68,34 @@ jobs:
               }
             }' -f user=$USER -f number=$PROJECT_NUMBER > project_data.json
 
-          # Парсим ответ и сохраняем ID в environment variables
           echo 'PROJECT_ID='$(jq '.data.user.projectV2.id' project_data.json) >> $GITHUB_ENV
           echo 'PROJECT_TITLE='$(jq -r '.data.user.projectV2.title' project_data.json) >> $GITHUB_ENV
           
-          # Пытаемся найти поле Status
+          # Поля для статуса
           STATUS_FIELD_ID=$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .id' project_data.json)
           if [ "$STATUS_FIELD_ID" != "null" ] && [ -n "$STATUS_FIELD_ID" ]; then
             echo 'STATUS_FIELD_ID='$STATUS_FIELD_ID >> $GITHUB_ENV
             echo 'TODO_OPTION_ID='$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") | .id' project_data.json) >> $GITHUB_ENV
-          fi
-          
-          # Пытаемся найти поле Date posted
-          DATE_FIELD_ID=$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Date posted") | .id' project_data.json)
-          if [ "$DATE_FIELD_ID" != "null" ] && [ -n "$DATE_FIELD_ID" ]; then
-            echo 'DATE_FIELD_ID='$DATE_FIELD_ID >> $GITHUB_ENV
+            echo 'DONE_OPTION_ID='$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Done") | .id' project_data.json) >> $GITHUB_ENV
           fi
 
-          echo "📊 Project: $PROJECT_TITLE" >> $GITHUB_STEP_SUMMARY
-          echo "🔧 Project ID: $PROJECT_ID" >> $GITHUB_STEP_SUMMARY
-
-      - name: ➕ Add item to project
+      - name: ➕ Add item to project (new items)
+        if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
-          # Определяем ID элемента в зависимости от типа события
           if [ "${{ github.event_name }}" = "issues" ]; then
             CONTENT_ID="${{ github.event.issue.node_id }}"
             ITEM_TYPE="issue"
             ITEM_NUMBER=${{ github.event.issue.number }}
           else
             CONTENT_ID="${{ github.event.pull_request.node_id }}"
-            ITEM_TYPE="pull request"
+            ITEM_TYPE="pull request" 
             ITEM_NUMBER=${{ github.event.pull_request.number }}
           fi
 
           echo "🎯 Adding $ITEM_TYPE #$ITEM_NUMBER to project..." >> $GITHUB_STEP_SUMMARY
 
-          # Добавляем элемент в проект
           item_id=$(gh api graphql -f query='
             mutation($project:ID!, $content:ID!) {
               addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
@@ -109,92 +106,129 @@ jobs:
             }' -f project=$PROJECT_ID -f content=$CONTENT_ID --jq '.data.addProjectV2ItemById.item.id')
 
           echo 'ITEM_ID='$item_id >> $GITHUB_ENV
-          echo "✅ Added to project! Item ID: $item_id" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Added to project!" >> $GITHUB_STEP_SUMMARY
 
-      - name: 📅 Get current date
-        if: env.ITEM_ID != ''
-        run: echo "DATE=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
-
-      - name: ⚙️ Set field values
-        if: env.ITEM_ID != '' && (env.STATUS_FIELD_ID != '' || env.DATE_FIELD_ID != '')
+      - name: 🔄 Update item status (closed items)
+        if: github.event.action == 'closed'
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
-          echo "🔧 Setting field values..." >> $GITHUB_STEP_SUMMARY
-          
-          # Базовый запрос для установки значений
-          QUERY_BASE='
-            mutation ($project: ID!, $item: ID!'
-          
-          # Добавляем части запроса в зависимости от доступных полей
-          VARIABLES="-f project=$PROJECT_ID -f item=$ITEM_ID"
-          QUERY_FIELDS=""
-          QUERY_BODY=""
-          
-          if [ -n "$STATUS_FIELD_ID" ] && [ -n "$TODO_OPTION_ID" ]; then
-            QUERY_BASE+=', $status_field: ID!, $status_value: String!'
-            VARIABLES+=" -f status_field=$STATUS_FIELD_ID -f status_value=$TODO_OPTION_ID"
-            QUERY_FIELDS+='
-              set_status: updateProjectV2ItemFieldValue(input: {
-                projectId: $project
-                itemId: $item
-                fieldId: $status_field
-                value: {
-                  singleSelectOptionId: $status_value
-                }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }'
-          fi
-          
-          if [ -n "$DATE_FIELD_ID" ]; then
-            QUERY_BASE+=', $date_field: ID!, $date_value: Date!'
-            VARIABLES+=" -f date_field=$DATE_FIELD_ID -f date_value=$DATE"
-            QUERY_FIELDS+='
-              set_date: updateProjectV2ItemFieldValue(input: {
-                projectId: $project
-                itemId: $item
-                fieldId: $date_field
-                value: {
-                  date: $date_value
-                }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }'
-          fi
-          
-          QUERY_BASE+=') {'
-          FULL_QUERY="$QUERY_BASE $QUERY_FIELDS }"
-          
-          if [ -n "$QUERY_FIELDS" ]; then
-            gh api graphql -f query="$FULL_QUERY" $VARIABLES --silent
-            echo "✅ Field values set successfully!" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ℹ️ No fields to set (Status or Date posted fields not found)" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: 📋 Create summary
-        if: always()
-        run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 Workflow Results" >> $GITHUB_STEP_SUMMARY
+          echo "🔄 Updating status for closed item..." >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ github.event_name }}" = "issues" ]; then
-            echo "- **Issue:** #${{ github.event.issue.number }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Title:** ${{ github.event.issue.title }}" >> $GITHUB_STEP_SUMMARY
+            CONTENT_ID="${{ github.event.issue.node_id }}"
+            ITEM_TYPE="issue"
+            ITEM_NUMBER=${{ github.event.issue.number }}
           else
-            echo "- **Pull Request:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Title:** ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+            CONTENT_ID="${{ github.event.pull_request.node_id }}"
+            ITEM_TYPE="pull request"
+            ITEM_NUMBER=${{ github.event.pull_request.number }}
           fi
+
+          # Находим item в проекте
+          ITEM_ID=$(gh api graphql -f query='
+            query($project: ID!, $content: ID!) {
+              node(id: $project) {
+                ... on ProjectV2 {
+                  items(first: 100) {
+                    nodes {
+                      id
+                      content {
+                        ... on Issue {
+                          id
+                        }
+                        ... on PullRequest {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }' -f project=$PROJECT_ID -f content=$CONTENT_ID \
+            --jq '.data.node.items.nodes[] | select(.content.id == $content) | .id')
+
+          if [ -n "$ITEM_ID" ] && [ -n "$STATUS_FIELD_ID" ] && [ -n "$DONE_OPTION_ID" ]; then
+            gh api graphql -f query='
+              mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $project
+                  itemId: $item
+                  fieldId: $field
+                  value: {
+                    singleSelectOptionId: $value
+                  }
+                }) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }' -f project=$PROJECT_ID -f item=$ITEM_ID -f field=$STATUS_FIELD_ID -f value=$DONE_OPTION_ID --silent
+            
+            echo "✅ Status updated to Done" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ Status update skipped (item not in project or status field not found)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📅 Set field values for new items
+        if: env.ITEM_ID != '' && (github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review')
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          echo "🔧 Setting field values for new item..." >> $GITHUB_STEP_SUMMARY
+          echo "DATE=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
           
+          if [ -n "$STATUS_FIELD_ID" ] && [ -n "$TODO_OPTION_ID" ]; then
+            gh api graphql -f query='
+              mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $project
+                  itemId: $item
+                  fieldId: $field
+                  value: {
+                    singleSelectOptionId: $value
+                  }
+                }) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }' -f project=$PROJECT_ID -f item=$ITEM_ID -f field=$STATUS_FIELD_ID -f value=$TODO_OPTION_ID --silent
+            echo "✅ Status set to Todo" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 🔍 Manual sync (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.sync_all == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          echo "### 🔍 Manual Sync" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Syncing all open items..." >> $GITHUB_STEP_SUMMARY
+          
+          # Синхронизация issues
+          gh issue list --state open --limit 30 --json number,title,url | jq -c '.[]' | while read item; do
+            number=$(echo "$item" | jq -r '.number')
+            url=$(echo "$item" | jq -r '.url')
+            gh project item-add 3 --user NightMira --url "$url" 2>/dev/null && echo "✅ Issue #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ Issue #$number" >> $GITHUB_STEP_SUMMARY
+          done
+          
+          # Синхронизация PR
+          gh pr list --state open --limit 30 --json number,title,url | jq -c '.[]' | while read item; do
+            number=$(echo "$item" | jq -r '.number')
+            url=$(echo "$item" | jq -r '.url')
+            gh project item-add 3 --user NightMira --url "$url" 2>/dev/null && echo "✅ PR #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ PR #$number" >> $GITHUB_STEP_SUMMARY
+          done
+          
+          echo "✅ Manual sync completed!" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📋 Final summary
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Event:** ${{ github.event_name }}.${{ github.event.action }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Project:** $PROJECT_TITLE" >> $GITHUB_STEP_SUMMARY
-          echo "- **Project URL:** https://github.com/users/NightMira/projects/3" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** ✅ Successfully added to project" >> $GITHUB_STEP_SUMMARY
           echo "- **Timestamp:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** ✅ Automation completed" >> $GITHUB_STEP_SUMMARY
 
       - name: 🧹 Cleanup
         if: always()
