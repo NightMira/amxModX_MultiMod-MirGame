@@ -17,27 +17,27 @@
 #define PROJECT_VERSION_MAJOR_NUM 0
 #define PROJECT_VERSION_MINOR "0"
 #define PROJECT_VERSION_MINOR_NUM 0
-#define PROJECT_VERSION_PATCH "5"
-#define PROJECT_VERSION_PATCH_NUM 5
-#define PROJECT_VERSION "0.0.5"
-#define PROJECT_VERSION_NUM 5
+#define PROJECT_VERSION_PATCH "6"
+#define PROJECT_VERSION_PATCH_NUM 6
+#define PROJECT_VERSION "0.0.6"
+#define PROJECT_VERSION_NUM 6
 
 // Version Suffix (Pre-release tags)
-#define PROJECT_VERSION_TAG "SNAPSHOT.a8a50b2"
-#define PROJECT_VERSION_SUFFIX "-SNAPSHOT.a8a50b2"
+#define PROJECT_VERSION_TAG ""
+#define PROJECT_VERSION_SUFFIX ""
 
 // Build Information
-#define PROJECT_BUILD "130"
-#define PROJECT_BUILD_NUM 130
-#define PROJECT_BUILD_DATE "2025-09-20"
+#define PROJECT_BUILD "138"
+#define PROJECT_BUILD_NUM 138
+#define PROJECT_BUILD_DATE "2025-09-22"
 #define PROJECT_BUILD_TIME          __TIME__
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
 // Git Commit Information
-#define PROJECT_COMMIT_HASH "a8a50b2df3f0a6b701382d0809238367384a8d7e"
-#define PROJECT_COMMIT_SHORT_HASH "a8a50b2"
+#define PROJECT_COMMIT_HASH "205759a741ff99eb705eddc0f6a1d41b49a18996"
+#define PROJECT_COMMIT_SHORT_HASH "205759a"
 #define PROJECT_COMMIT_AUTHOR "MirGame"
-#define PROJECT_COMMIT_DATE "2025-09-20"
+#define PROJECT_COMMIT_DATE "2025-09-22"
 
 /* ========================================================================== */
 /*                            COMPATIBILITY MACROS                            */
