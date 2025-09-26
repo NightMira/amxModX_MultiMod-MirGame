@@ -211,7 +211,7 @@ def increment_version(version_type):
     success3 = update_build_date()
     success4 = update_version_define('PROJECT_VERSION_SUFFIX', "")
     success5 = update_version_define('PROJECT_VERSION_TAG', "")
-    success6 = update_git_info()  # ← ДОБАВЛЕНО ОБНОВЛЕНИЕ GIT INFO
+    success6 = update_git_info()
     
     if success1 and success2 and success3 and success4 and success5 and success6:
         print(f"✅ Version updated successfully to {new_version}")
@@ -234,7 +234,7 @@ def update_build_number():
     success1 = update_version_define('PROJECT_BUILD', new_build)
     success2 = update_version_define('PROJECT_BUILD_NUM', new_build, False)
     success3 = update_build_date()
-    success4 = update_git_info()  # ← ДОБАВЛЕНО ОБНОВЛЕНИЕ GIT INFO
+    success4 = update_git_info()
     
     if success1 and success2 and success3 and success4:
         print(f"✅ Build number updated: {info.get('build', 'N/A')} → {new_build}")
@@ -284,7 +284,7 @@ def update_version_suffix(suffix_type, number=""):
     success1 = update_version_define('PROJECT_VERSION_SUFFIX', new_suffix)
     success2 = update_version_define('PROJECT_VERSION_TAG', new_tag)
     success3 = update_build_date()
-    success4 = update_git_info()  # ← ДОБАВЛЕНО ОБНОВЛЕНИЕ GIT INFO
+    success4 = update_git_info()
     
     if success1 and success2 and success3 and success4:
         action = "removed" if not new_suffix else f"set to {new_suffix}"
@@ -313,6 +313,7 @@ def handle_command(args):
             print(f"   Suffix: '{info['suffix'] or ''}'")
             print(f"   Tag: '{info.get('tag', 'N/A')}'")
         return True
+        
     elif command in ['git-info', '-gi']:
         return update_git_info()
     
@@ -326,7 +327,8 @@ def handle_command(args):
         return increment_version("patch")
         
     elif command in ['build', '-b']:
-        return update_build_number() is not None
+        result = update_build_number()
+        return result is not None
         
     elif command in ['snapshot', '-s']:
         number = args[1] if len(args) > 1 else ""

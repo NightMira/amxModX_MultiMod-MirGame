@@ -4,3 +4,4 @@ compiled/*
 compile.log
 .github/ISSUE_TEMPLATE/command.md
 .gitignore
+.github/workflows/test.yml
