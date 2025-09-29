@@ -90,6 +90,10 @@ def update_version_define(define_name, new_value, is_string=True):
     except Exception as e:
         print(f"❌ Error updating {define_name}: {e}")
         return False
+def update_version_num(major, minor, patch):
+    """Обновляет PROJECT_VERSION_NUM в формате MMMmmmppp"""
+    version_num = (major * 10000) + (minor * 100) + patch
+    return update_version_define('PROJECT_VERSION_NUM', version_num, False)
 
 def update_build_date():
     return update_version_define('PROJECT_BUILD_DATE', datetime.datetime.now().strftime('%Y-%m-%d'))
@@ -407,16 +411,22 @@ def increment_version(version_type):
     print(f"🔄 Updating version: {old_version} → {new_version}")
     print("📌 Removing version suffix (as per SemVer rules)")
     
+    # Обновляем ВСЕ версионные поля
     success1 = update_version_define('PROJECT_VERSION', new_version)
     success2 = update_version_define('PROJECT_VERSION_MAJOR', str(major))
-    success3 = update_version_define('PROJECT_VERSION_MINOR', str(minor))
-    success4 = update_version_define('PROJECT_VERSION_PATCH', str(patch))
-    success5 = update_build_date()
-    success6 = update_version_define('PROJECT_VERSION_SUFFIX', "")
-    success7 = update_version_define('PROJECT_VERSION_TAG', "")
-    success8 = update_git_info()
+    success3 = update_version_define('PROJECT_VERSION_MAJOR_NUM', major, False)
+    success4 = update_version_define('PROJECT_VERSION_MINOR', str(minor))
+    success5 = update_version_define('PROJECT_VERSION_MINOR_NUM', minor, False)
+    success6 = update_version_define('PROJECT_VERSION_PATCH', str(patch))
+    success7 = update_version_define('PROJECT_VERSION_PATCH_NUM', patch, False)  # ДОБАВЛЕНО
+    success8 = update_version_num(major, minor, patch)  # ДОБАВЛЕНО
+    success9 = update_build_date()
+    success10 = update_version_define('PROJECT_VERSION_SUFFIX', "")
+    success11 = update_version_define('PROJECT_VERSION_TAG', "")
+    success12 = update_git_info()
     
-    if success1 and success2 and success3 and success4 and success5 and success6 and success7 and success8:
+    if all([success1, success2, success3, success4, success5, success6, 
+            success7, success8, success9, success10, success11, success12]):
         print(f"✅ Version updated successfully to {new_version}")
         return True
     else:

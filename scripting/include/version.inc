@@ -27,8 +27,8 @@
 #define PROJECT_VERSION_SUFFIX ""
 
 // MirGame Build System Information
-#define PROJECT_BUILD "00F0001l"      // MirGame format: 01D0001l
-#define PROJECT_BUILD_NUM 1               // Build counter
+#define PROJECT_BUILD "00F0008l"      // MirGame format: 01D0001l
+#define PROJECT_BUILD_NUM 8               // Build counter
 #define PROJECT_BUILD_TYPE "local"         // Build type
 #define PROJECT_BRANCH_CODE "F"             // Branch code (R=Release, D=Dev, etc.)
 #define PROJECT_BUILD_SUFFIX "l"             // Build suffix
@@ -37,10 +37,10 @@
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
 // Git Commit Information
-#define PROJECT_COMMIT_HASH "041835ca108262b4ac1820b55d39f48e8b488499"
-#define PROJECT_COMMIT_SHORT_HASH "041835c"
+#define PROJECT_COMMIT_HASH "977cfd97ad824b3179488b1b229887ff5114a14d"
+#define PROJECT_COMMIT_SHORT_HASH "977cfd9"
 #define PROJECT_COMMIT_AUTHOR "MirGame"
-#define PROJECT_COMMIT_DATE "2025-09-26"
+#define PROJECT_COMMIT_DATE "2025-09-29"
 
 /* ========================================================================== */
 /*                            COMPATIBILITY MACROS                            */
