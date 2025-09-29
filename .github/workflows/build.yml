@@ -43,6 +43,7 @@ jobs:
           MIRGAME_BUILD=$(grep 'PROJECT_BUILD' scripting/include/version.inc | awk -F '"' '{print $2}')
           echo "MIRGAME_BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
           echo "BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
+          echo "BUILD_TYPE=ci" >> $GITHUB_ENV 
 
       - name: 🏗️ Compile all plugins
         run: |
