@@ -34,21 +34,32 @@ jobs:
           chmod +x amxxpc
           ./amxxpc --help || true
 
-      - name: 🏷️ Generate MirGame build number
+      - name: 🏷️ Generate build number
+        id: generate-build
         run: |
+          # Генерируем номер сборки
           python3 update_version.py build-mirgame
-          echo "🔍 Анализ номера сборки:"
-          python3 update_version.py decode-build
           
-          MIRGAME_BUILD=$(grep 'PROJECT_BUILD' scripting/include/version.inc | awk -F '"' '{print $2}')
-          echo "MIRGAME_BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
+          # Извлекаем номер ПРЯМО из файла
+          MIRGAME_BUILD=$(sed -n 's/^#define PROJECT_BUILD "\([^"]*\)"/\1/p' scripting/include/version.inc)
+          
+          # Проверяем что номер получен
+          if [ -z "$MIRGAME_BUILD" ]; then
+            echo "❌ Failed to extract build number"
+            exit 1
+          fi
+          
+          # Устанавливаем переменные
           echo "BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
           echo "build_number=$MIRGAME_BUILD" >> $GITHUB_OUTPUT
+          
+          echo "✅ Build number: $MIRGAME_BUILD"
 
-      - name: 📝 Debug build information
+      - name: 📊 Debug information
+        if: always()
         run: |
-          echo "✅ Сгенерированный номер сборки: ${{ env.MIRGAME_BUILD_NUMBER }}"
-          echo "✅ Build number output: ${{ steps.build-number.outputs.build_number }}"
+          echo "Build number from env: $BUILD_NUMBER"
+          echo "Build number from output: ${{ steps.generate-build.outputs.build_number }}"
 
       - name: 🏗️ Compile all plugins
         run: |
