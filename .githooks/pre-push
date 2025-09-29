@@ -1,0 +1,12 @@
+#!/bin/bash
+echo "🚀 Pre-push: Running build verification..."
+
+# Проверяем что проект компилируется
+if ./compile.sh > /dev/null 2>&1; then
+    echo "✅ Build verification passed"
+else
+    echo "❌ Build failed - fix issues before pushing"
+    exit 1
+fi
+
+exit 0

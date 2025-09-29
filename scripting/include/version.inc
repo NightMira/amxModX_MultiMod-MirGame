@@ -12,7 +12,7 @@
 #define PROJECT_AUTHOR              "MirGame"
 #define PROJECT_DESCRIPTION         "Advanced AMXX Modification Framework"
 
-// Semantic Versioning (SemVer)
+// Semantic Versioning (SemVer) - ✅ В репозитории (управляется вручную)
 #define PROJECT_VERSION_MAJOR "0"
 #define PROJECT_VERSION_MAJOR_NUM 0
 #define PROJECT_VERSION_MINOR "0"
@@ -22,23 +22,24 @@
 #define PROJECT_VERSION "0.0.6"
 #define PROJECT_VERSION_NUM 6
 
-// Version Suffix (Pre-release tags)
+// Version Suffix (Pre-release tags) - ✅ В репозитории (управляется вручную)
 #define PROJECT_VERSION_TAG "SNAPSHOT"
 #define PROJECT_VERSION_SUFFIX "-SNAPSHOT"
 
-// MirGame Build System Information
-#define PROJECT_BUILD "00D0001l"      // MirGame format: 01D0001l
-#define PROJECT_BUILD_NUM 1               // Build counter
-#define PROJECT_BUILD_TYPE "local"         // Build type
-#define PROJECT_BRANCH_CODE "D"             // Branch code (R=Release, D=Dev, etc.)
-#define PROJECT_BUILD_SUFFIX "l"             // Build suffix
-#define PROJECT_BUILD_DATE "2025-09-29"
+// MirGame Build System Information - ❌ Генерируется автоматически в CI
+// Эти поля будут перезаписаны при сборке в GitHub Actions
+#define PROJECT_BUILD               "TEMPLATE"      // Автоматически: 00D0002d
+#define PROJECT_BUILD_NUM           0               // Автоматически: 2
+#define PROJECT_BUILD_TYPE          "local"         // Автоматически: ci/developer/release
+#define PROJECT_BRANCH_CODE         "U"             // Автоматически: R/D/F/H/A/B/C/X
+#define PROJECT_BUILD_SUFFIX        "x"             // Автоматически: c/d/r/i/b
+#define PROJECT_BUILD_DATE          "2025-09-29"
 #define PROJECT_BUILD_TIME          __TIME__
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
-// Git Commit Information
-#define PROJECT_COMMIT_HASH "1c1a9f4529032e504e70ac45d61fb0f351665bd3"
-#define PROJECT_COMMIT_SHORT_HASH "1c1a9f4"
+// Git Commit Information - ✅ Обновляется автоматически
+#define PROJECT_COMMIT_HASH "8b93f4316cbca80b60e696215a05a70764182d52"
+#define PROJECT_COMMIT_SHORT_HASH "8b93f43"
 #define PROJECT_COMMIT_AUTHOR "MirGame"
 #define PROJECT_COMMIT_DATE "2025-09-29"
 

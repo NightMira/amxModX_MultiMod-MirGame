@@ -164,6 +164,9 @@ def generate_mirgame_build_number(branch_code, build_suffix):
     info = get_current_version_info()
     major_version = int(info['major'] or 1)
     
+    # Логируем текущее состояние
+    print(f"🔧 Build history for branch {branch_code}: {history['branch_builds'].get(branch_code, 0)}")
+    
     if branch_code not in history["branch_builds"]:
         history["branch_builds"][branch_code] = 0
     
@@ -178,6 +181,8 @@ def generate_mirgame_build_number(branch_code, build_suffix):
     mirgame_build_number = f"{major_version:02d}{branch_code}{formatted_build}{build_suffix}"
     
     save_build_history(history)
+    
+    print(f"🔧 Generated build {mirgame_build_number} (counter: {build_number})")
     return mirgame_build_number, build_number
 
 def get_branch_code(branch_name):
@@ -462,6 +467,44 @@ def update_version_suffix(suffix_type, number=""):
         return True
     return False
 
+def validate_version_consistency():
+    """Проверяет согласованность версионных данных"""
+    info = get_current_version_info()
+    if not info:
+        return False
+    
+    issues = []
+    
+    # Проверяем соответствие строковых и числовых значений
+    if info.get('major') and info.get('major_num'):
+        if int(info['major']) != int(info['major_num']):
+            issues.append(f"MAJOR mismatch: {info['major']} vs {info['major_num']}")
+    
+    if info.get('minor') and info.get('minor_num'):
+        if int(info['minor']) != int(info['minor_num']):
+            issues.append(f"MINOR mismatch: {info['minor']} vs {info['minor_num']}")
+    
+    if info.get('patch') and info.get('patch_num'):
+        if int(info['patch']) != int(info['patch_num']):
+            issues.append(f"PATCH mismatch: {info['patch']} vs {info['patch_num']}")
+    
+    # Проверяем PROJECT_VERSION_NUM
+    expected_num = (int(info.get('major', 0)) * 10000 + 
+                   int(info.get('minor', 0)) * 100 + 
+                   int(info.get('patch', 0)))
+    actual_num = int(info.get('version_num', 0))
+    if expected_num != actual_num:
+        issues.append(f"VERSION_NUM mismatch: expected {expected_num}, got {actual_num}")
+    
+    if issues:
+        print("⚠️ Version consistency issues found:")
+        for issue in issues:
+            print(f"   - {issue}")
+        return False
+    
+    print("✅ Version data is consistent")
+    return True
+
 def handle_command(args):
     if not args or args[0] in ['-h', '--help']:
         show_help()
@@ -532,6 +575,8 @@ def handle_command(args):
         
     elif command in ['major', '--major']:
         return increment_version("major")
+    elif command in ['validate', '-v']:
+        return validate_version_consistency()
         
     elif command in ['minor', '--minor']:
         return increment_version("minor")
@@ -581,6 +626,9 @@ def handle_command(args):
         version = info['version'] if info and info['version'] else "0.1.0"
         suffix = info['suffix'] if info and info['suffix'] else ""
         print(f"{version}{suffix}")
+        return True
+    elif command in ['git-info']:
+        update_git_info()
         return True
         
     else:

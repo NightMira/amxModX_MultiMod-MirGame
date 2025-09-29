@@ -5,3 +5,5 @@ compile.log
 .github/ISSUE_TEMPLATE/command.md
 .gitignore
 .github/workflows/test.yml
+.build_history.json
+*.build_history.json

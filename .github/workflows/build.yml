@@ -22,6 +22,15 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           fetch-depth: 0
 
+      - name: 📥 Cache build history
+        uses: actions/cache@v3
+        id: build-history-cache
+        with:
+          path: .build_history.json
+          key: build-history-${{ github.ref }}-${{ github.run_id }}
+          restore-keys: |
+            build-history-${{ github.ref }}-
+
       - name: 📦 Install system dependencies
         run: |
           sudo apt-get update
@@ -37,13 +46,8 @@ jobs:
       - name: 🏷️ Generate build number
         id: build-number
         run: |
-          # Генерируем номер сборки
           python3 update_version.py build-mirgame
-          
-          # Извлекаем номер ОДНОЙ командой без лишнего вывода
           MIRGAME_BUILD=$(awk -F '"' '/PROJECT_BUILD/ {print $2; exit}' scripting/include/version.inc)
-          
-          # Устанавливаем переменные
           echo "BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
           echo "build_number=$MIRGAME_BUILD" >> $GITHUB_OUTPUT
           echo "✅ Build number: $MIRGAME_BUILD"
@@ -83,6 +87,7 @@ jobs:
           echo "- **Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
           echo "- **Artifact:** amxx-plugins-${{ env.BUILD_NUMBER }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache Status:** ${{ steps.build-history-cache.outputs.cache-hit }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### 📋 Version Details" >> $GITHUB_STEP_SUMMARY
@@ -105,12 +110,15 @@ jobs:
         run: |
           echo "🎉 Build completed successfully!"
           echo "📦 Artifact: amxx-plugins-${{ env.BUILD_NUMBER }}"
+          echo "🔧 Build Number: ${{ env.BUILD_NUMBER }}"
+          echo "💾 Cache: ${{ steps.build-history-cache.outputs.cache-hit }}"
 
       - name: 🚨 Notify on failure
         if: failure()
         run: |
           echo "❌ Build failed!"
           echo "Please check the logs for errors."
+          echo "Cache status: ${{ steps.build-history-cache.outputs.cache-hit }}"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
