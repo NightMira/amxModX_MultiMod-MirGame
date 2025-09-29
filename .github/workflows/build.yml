@@ -43,7 +43,12 @@ jobs:
           MIRGAME_BUILD=$(grep 'PROJECT_BUILD' scripting/include/version.inc | awk -F '"' '{print $2}')
           echo "MIRGAME_BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
           echo "BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
-          echo "BUILD_TYPE=ci" >> $GITHUB_ENV 
+          echo "build_number=$MIRGAME_BUILD" >> $GITHUB_OUTPUT
+
+      - name: 📝 Debug build information
+        run: |
+          echo "✅ Сгенерированный номер сборки: ${{ env.MIRGAME_BUILD_NUMBER }}"
+          echo "✅ Build number output: ${{ steps.build-number.outputs.build_number }}"
 
       - name: 🏗️ Compile all plugins
         run: |
