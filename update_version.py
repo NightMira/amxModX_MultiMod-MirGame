@@ -627,9 +627,8 @@ def handle_command(args):
         suffix = info['suffix'] if info and info['suffix'] else ""
         print(f"{version}{suffix}")
         return True
-    elif command in ['git-info']:
-        update_git_info()
-        return True
+    elif command in ['git-info', 'gi']:
+        return update_git_info()
         
     else:
         print(f"❌ Unknown command: {command}")
