@@ -15,9 +15,7 @@ get_define_value() {
 }
 
 uses_project_author() {
-    # Проверяем использование PROJECT_AUTHOR в register_plugin
     grep -E "register_plugin\([^,]+,[^,]+,PROJECT_AUTHOR" "$1" >/dev/null 2>&1 ||
-    # Или использование PROJECT_AUTHOR в любом другом контексте
     grep -E "PROJECT_AUTHOR" "$1" >/dev/null 2>&1
 }
 
@@ -35,8 +33,8 @@ FULL_VERSION="${PROJECT_VERSION}${PROJECT_SUFFIX}"
 
 PROJECT_NAME=${PROJECT_NAME:-"MirGame Multi-Mod"}
 PROJECT_AUTHOR=${PROJECT_AUTHOR:-"MirGame"}
-PROJECT_BUILD=${PROJECT_BUILD:-"1"}
-PROJECT_VERSION=${PROJECT_VERSION:-"1.0.0"}
+PROJECT_BUILD=${PROJECT_BUILD:-"01D0001l"}
+PROJECT_VERSION=${PROJECT_VERSION:-"0.0.5"}
 
 echo "🔨 [$PROJECT_NAME] Starting compilation..."
 echo "🏷️ Version: $FULL_VERSION (build $PROJECT_BUILD)"
@@ -63,11 +61,9 @@ compile_plugin() {
     [ -z "$plugin_name" ] && { warnings+="PLUGIN_NAME "; local_warnings=$((local_warnings + 1)); plugin_name="Not name"; }
     [ -z "$plugin_version" ] && { warnings+="PLUGIN_VERSION "; local_warnings=$((local_warnings + 1)); plugin_version=""; }
     
-    # ОСНОВНОЕ ИСПРАВЛЕНИЕ: проверяем использование PROJECT_AUTHOR
     if [ -z "$plugin_author" ] && ! uses_project_author "$sma_file"; then
         warnings+="PLUGIN_AUTHOR "; local_warnings=$((local_warnings + 1)); plugin_author="Not author"
     elif [ -z "$plugin_author" ] && uses_project_author "$sma_file"; then
-        # Если используется PROJECT_AUTHOR, используем автора проекта
         plugin_author="$PROJECT_AUTHOR"
         echo "📝 Using PROJECT_AUTHOR: $plugin_author" >> "$LOG_FILE"
     fi

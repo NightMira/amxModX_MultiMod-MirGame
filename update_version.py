@@ -2,89 +2,24 @@
 import re, datetime, os, sys, json, subprocess
 
 VERSION_FILE = "scripting/include/version.inc"
+BUILD_HISTORY_FILE = ".build_history.json"
 
-def show_help():
-    print("🚀 AMXX Version Management Tool - SemVer")
-    print("Usage: python update_version.py [COMMAND] [OPTIONS]")
-    print("\nCommands:")
-    print("  info                     Show current version information")
-    print("  major                    Increment major version (X.0.0)")
-    print("  minor                    Increment minor version (0.Y.0)")  
-    print("  patch                    Increment patch version (0.0.Z)")
-    print("  build                    Increment build number")
-    print("  snapshot [N]             Set SNAPSHOT.N suffix")
-    print("  release                  Remove suffix for final release")
-    print("  alpha [N]                Set alpha.N suffix")
-    print("  beta [N]                 Set beta.N suffix")
-    print("  rc [N]                   Set rc.N suffix")
-    print("  hotfix [N]               Set hotfix.N suffix")
-    print("  get-version              Get base version (X.Y.Z)")
-    print("  get-suffix               Get version suffix")
-    print("  get-full-version         Get full version with suffix")
-
-def get_git_info():
-    """Получает информацию о git коммите"""
-    git_info = {
-        'commit_hash': '',
-        'commit_short_hash': '',
-        'commit_author': '',
-        'commit_date': ''
+def get_build_history():
+    """Загружает историю сборок"""
+    if os.path.exists(BUILD_HISTORY_FILE):
+        with open(BUILD_HISTORY_FILE, 'r') as f:
+            return json.load(f)
+    return {
+        "major_version": 1,
+        "branch_builds": {},
+        "total_builds": 0,
+        "last_build_date": ""
     }
-    
-    try:
-        # Полный хэш коммита
-        git_info['commit_hash'] = subprocess.check_output(
-            ['git', 'rev-parse', 'HEAD'], 
-            stderr=subprocess.DEVNULL
-        ).decode().strip()
-        
-        # Короткий хэш коммита (7 символов)
-        git_info['commit_short_hash'] = subprocess.check_output(
-            ['git', 'rev-parse', '--short', 'HEAD'],
-            stderr=subprocess.DEVNULL
-        ).decode().strip()
-        
-        # Автор коммита
-        git_info['commit_author'] = subprocess.check_output(
-            ['git', 'log', '-1', '--pretty=format:%an'],
-            stderr=subprocess.DEVNULL
-        ).decode().strip()
-        
-        # Дата коммита (в формате YYYY-MM-DD)
-        git_info['commit_date'] = subprocess.check_output(
-            ['git', 'log', '-1', '--pretty=format:%cd', '--date=short'],
-            stderr=subprocess.DEVNULL
-        ).decode().strip()
-        
-    except Exception as e:
-        print(f"⚠️ Could not get git info: {e}")
-        # Устанавливаем значения по умолчанию
-        git_info['commit_hash'] = 'unknown'
-        git_info['commit_short_hash'] = 'unknown'
-        git_info['commit_author'] = os.getenv('GITHUB_ACTOR', 'unknown')
-        git_info['commit_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
-    
-    return git_info
 
-def update_git_info():
-    """Обновляет информацию о git коммите в version.inc"""
-    git_info = get_git_info()
-    
-    success = True
-    success &= update_version_define('PROJECT_COMMIT_HASH', git_info['commit_hash'])
-    success &= update_version_define('PROJECT_COMMIT_SHORT_HASH', git_info['commit_short_hash'])
-    success &= update_version_define('PROJECT_COMMIT_AUTHOR', git_info['commit_author'])
-    success &= update_version_define('PROJECT_COMMIT_DATE', git_info['commit_date'])
-    
-    if success:
-        print("✅ Git commit information updated")
-        print(f"   Hash: {git_info['commit_short_hash']}")
-        print(f"   Author: {git_info['commit_author']}")
-        print(f"   Date: {git_info['commit_date']}")
-    else:
-        print("❌ Failed to update git commit information")
-    
-    return success
+def save_build_history(history):
+    """Сохраняет историю сборок"""
+    with open(BUILD_HISTORY_FILE, 'w') as f:
+        json.dump(history, f, indent=2)
 
 def get_current_version_info():
     if not os.path.exists(VERSION_FILE):
@@ -101,7 +36,7 @@ def get_current_version_info():
         return {
             'version': find_define(r'#define PROJECT_VERSION\s+"([^"]+)"'),
             'suffix': find_define(r'#define PROJECT_VERSION_SUFFIX\s+"([^"]*)"'),
-            'build': find_define(r'#define PROJECT_BUILD\s+"(\d+)"'),
+            'build': find_define(r'#define PROJECT_BUILD\s+"([^"]+)"'),
             'build_num': find_define(r'#define PROJECT_BUILD_NUM\s+(\d+)'),
             'build_date': find_define(r'#define PROJECT_BUILD_DATE\s+"([^"]+)"'),
             'major': find_define(r'#define PROJECT_VERSION_MAJOR\s+"([^"]+)"'),
@@ -159,20 +94,286 @@ def update_version_define(define_name, new_value, is_string=True):
 def update_build_date():
     return update_version_define('PROJECT_BUILD_DATE', datetime.datetime.now().strftime('%Y-%m-%d'))
 
-def update_version_num(major, minor, patch):
-    version_num = int(f"{major:02d}{minor:02d}{patch:02d}")
-    return update_version_define('PROJECT_VERSION_NUM', version_num, False)
+def get_git_info():
+    """Получает информацию о git коммите"""
+    git_info = {
+        'commit_hash': '',
+        'commit_short_hash': '',
+        'commit_author': '',
+        'commit_date': ''
+    }
+    
+    try:
+        git_info['commit_hash'] = subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], 
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+        git_info['commit_short_hash'] = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+        git_info['commit_author'] = subprocess.check_output(
+            ['git', 'log', '-1', '--pretty=format:%an'],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+        git_info['commit_date'] = subprocess.check_output(
+            ['git', 'log', '-1', '--pretty=format:%cd', '--date=short'],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+    except Exception as e:
+        print(f"⚠️ Could not get git info: {e}")
+        git_info['commit_hash'] = 'unknown'
+        git_info['commit_short_hash'] = 'unknown'
+        git_info['commit_author'] = os.getenv('GITHUB_ACTOR', 'unknown')
+        git_info['commit_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
+    
+    return git_info
 
-def update_numeric_version(major, minor, patch):
+def update_git_info():
+    """Обновляет информацию о git коммите в version.inc"""
+    git_info = get_git_info()
+    
     success = True
-    success &= update_version_define('PROJECT_VERSION_MAJOR', str(major))
-    success &= update_version_define('PROJECT_VERSION_MAJOR_NUM', major, False)
-    success &= update_version_define('PROJECT_VERSION_MINOR', str(minor))
-    success &= update_version_define('PROJECT_VERSION_MINOR_NUM', minor, False)
-    success &= update_version_define('PROJECT_VERSION_PATCH', str(patch))
-    success &= update_version_define('PROJECT_VERSION_PATCH_NUM', patch, False)
-    success &= update_version_num(major, minor, patch)
+    success &= update_version_define('PROJECT_COMMIT_HASH', git_info['commit_hash'])
+    success &= update_version_define('PROJECT_COMMIT_SHORT_HASH', git_info['commit_short_hash'])
+    success &= update_version_define('PROJECT_COMMIT_AUTHOR', git_info['commit_author'])
+    success &= update_version_define('PROJECT_COMMIT_DATE', git_info['commit_date'])
+    
+    if success:
+        print("✅ Git commit information updated")
+        print(f"   Hash: {git_info['commit_short_hash']}")
+        print(f"   Author: {git_info['commit_author']}")
+        print(f"   Date: {git_info['commit_date']}")
+    else:
+        print("❌ Failed to update git commit information")
+    
     return success
+
+def generate_mirgame_build_number(branch_code, build_suffix):
+    """Генерирует номер сборки в стиле MirGame"""
+    history = get_build_history()
+    
+    info = get_current_version_info()
+    major_version = int(info['major'] or 1)
+    
+    if branch_code not in history["branch_builds"]:
+        history["branch_builds"][branch_code] = 0
+    
+    history["branch_builds"][branch_code] += 1
+    history["total_builds"] += 1
+    history["major_version"] = major_version
+    history["last_build_date"] = datetime.datetime.now().isoformat()
+    
+    build_number = history["branch_builds"][branch_code]
+    
+    formatted_build = f"{build_number:04d}"
+    mirgame_build_number = f"{major_version:02d}{branch_code}{formatted_build}{build_suffix}"
+    
+    save_build_history(history)
+    return mirgame_build_number, build_number
+
+def get_branch_code(branch_name):
+    """Определяет код ветки по имени ветки Git"""
+    branch_name = branch_name.lower()
+    
+    exact_matches = {
+        'main': 'R',
+        'dev': 'D',
+    }
+    
+    pattern_matches = {
+        'hotfix/': 'H',
+        'alpha/': 'A',
+        'beta/': 'B',
+        'rc/': 'C',
+        'feature/': 'F',
+        'bugfix/': 'X',
+    }
+    
+    for exact_branch, code in exact_matches.items():
+        if branch_name == exact_branch:
+            return code
+    
+    for pattern, code in pattern_matches.items():
+        if branch_name.startswith(pattern):
+            return code
+    
+    if branch_name == 'pr':
+        return 'P'
+    
+    return 'U'
+
+def get_build_suffix(build_type):
+    """Определяет суффикс типа сборки"""
+    suffix_mapping = {
+        'internal': 'i',
+        'developer': 'd',
+        'beta': 'b',
+        'release': 'r',
+        'nightly': 'n',
+        'snapshot': 's',
+        'ci': 'c',
+        'local': 'l'
+    }
+    return suffix_mapping.get(build_type.lower(), 'x')
+
+def detect_build_type():
+    """Автоматически определяет тип сборки по окружению"""
+    if os.getenv('GITHUB_ACTIONS'):
+        ref = os.getenv('GITHUB_REF', '')
+        
+        if ref.startswith('refs/tags/'):
+            return 'release'
+        elif ref == 'refs/heads/main':
+            return 'release'
+        elif ref == 'refs/heads/dev':
+            return 'developer'
+        elif '/alpha/' in ref:
+            return 'internal'
+        elif '/beta/' in ref:
+            return 'beta'
+        elif '/rc/' in ref:
+            return 'beta'
+        elif '/hotfix/' in ref:
+            return 'internal'
+        else:
+            return 'ci'
+    else:
+        return 'local'
+
+def update_build_number():
+    """Обновляет номер сборки в стиле MirGame"""
+    info = get_current_version_info()
+    if not info:
+        return False
+    
+    branch_name = get_current_branch_name()
+    branch_code = get_branch_code(branch_name)
+    build_type = detect_build_type()
+    build_suffix = get_build_suffix(build_type)
+    
+    mirgame_build_number, build_counter = generate_mirgame_build_number(branch_code, build_suffix)
+    
+    success = True
+    success &= update_version_define('PROJECT_BUILD', mirgame_build_number)
+    success &= update_version_define('PROJECT_BUILD_NUM', build_counter, False)
+    success &= update_version_define('PROJECT_BUILD_TYPE', build_type)
+    success &= update_version_define('PROJECT_BRANCH_CODE', branch_code)
+    success &= update_version_define('PROJECT_BUILD_SUFFIX', build_suffix)
+    success &= update_build_date()
+    success &= update_git_info()
+    
+    if success:
+        print(f"✅ Номер сборки обновлен: {mirgame_build_number}")
+        print(f"   Ветка: {branch_name} ({branch_code})")
+        print(f"   Тип: {build_type} ({build_suffix})")
+        print(f"   Счетчик: {build_counter}")
+        return mirgame_build_number
+    return False
+
+def get_current_branch_name():
+    """Получает имя текущей ветки Git"""
+    try:
+        if os.getenv('GITHUB_ACTIONS'):
+            ref = os.getenv('GITHUB_REF', '')
+            
+            if ref.startswith('refs/tags/'):
+                return 'main'
+            elif ref.startswith('refs/heads/'):
+                branch_name = ref[11:]
+                
+                patterns = ['hotfix/', 'alpha/', 'beta/', 'rc/', 'feature/', 'bugfix/']
+                for pattern in patterns:
+                    if branch_name.startswith(pattern):
+                        return branch_name
+                
+                if branch_name in ['main', 'dev']:
+                    return branch_name
+                
+                return branch_name
+            elif ref.startswith('refs/pull/'):
+                return 'pr'
+        
+        result = subprocess.check_output(['git', 'branch', '--show-current'], 
+                                        stderr=subprocess.DEVNULL)
+        branch_name = result.decode().strip()
+        
+        patterns = ['hotfix/', 'alpha/', 'beta/', 'rc/', 'feature/', 'bugfix/']
+        for pattern in patterns:
+            if branch_name.startswith(pattern):
+                return branch_name
+        
+        return branch_name
+        
+    except:
+        return 'unknown'
+
+def decode_build_number(build_number):
+    """Декодирует номер сборки в стиле MirGame"""
+    if len(build_number) < 7:
+        return None
+    
+    try:
+        major = int(build_number[0:2])
+        branch_code = build_number[2]
+        build_counter = int(build_number[3:7])
+        suffix = build_number[7] if len(build_number) > 7 else ''
+        
+        branch_names = {
+            'R': 'main (Релиз)',
+            'D': 'dev (Разработка)', 
+            'H': 'hotfix/* (Исправление)',
+            'A': 'alpha/* (Альфа)',
+            'B': 'beta/* (Бета)',
+            'C': 'rc/* (Кандидат)',
+            'F': 'feature/* (Функция)',
+            'X': 'bugfix/* (Баги)',
+            'P': 'PR (Pull Request)',
+            'U': 'Unknown (Неизвестная)'
+        }
+        
+        suffix_names = {
+            'i': 'Internal (Внутренняя)',
+            'd': 'Developer (Разработчика)', 
+            'b': 'Beta (Бета)',
+            'r': 'Release (Релиз)',
+            'n': 'Nightly (Ночная)',
+            's': 'Snapshot (Снапшот)',
+            'c': 'CI (Непрерывная интеграция)',
+            'l': 'Local (Локальная)',
+            'x': 'Experimental (Экспериментальная)'
+        }
+        
+        return {
+            'major_version': major,
+            'branch_code': branch_code,
+            'branch_name': branch_names.get(branch_code, 'Unknown'),
+            'build_counter': build_counter,
+            'suffix': suffix,
+            'suffix_name': suffix_names.get(suffix, 'Unknown'),
+            'full_decode': f"Версия {major}, ветка {branch_names.get(branch_code, 'Unknown')}, сборка #{build_counter} ({suffix_names.get(suffix, 'Unknown')})"
+        }
+    except:
+        return None
+
+def get_branch_stats():
+    """Статистика по использованию веток"""
+    history = get_build_history()
+    
+    print("📊 Статистика по веткам:")
+    for branch_code, count in sorted(history["branch_builds"].items()):
+        branch_names = {
+            'R': 'main', 'D': 'dev', 'H': 'hotfix/*', 'A': 'alpha/*',
+            'B': 'beta/*', 'C': 'rc/*', 'F': 'feature/*', 'X': 'bugfix/*',
+            'P': 'PR', 'U': 'unknown'
+        }
+        print(f"   {branch_code} ({branch_names.get(branch_code, 'unknown')}): {count} сборок")
+    
+    return True
 
 def increment_version(version_type):
     info = get_current_version_info()
@@ -207,56 +408,20 @@ def increment_version(version_type):
     print("📌 Removing version suffix (as per SemVer rules)")
     
     success1 = update_version_define('PROJECT_VERSION', new_version)
-    success2 = update_numeric_version(major, minor, patch)
-    success3 = update_build_date()
-    success4 = update_version_define('PROJECT_VERSION_SUFFIX', "")
-    success5 = update_version_define('PROJECT_VERSION_TAG', "")
-    success6 = update_git_info()
+    success2 = update_version_define('PROJECT_VERSION_MAJOR', str(major))
+    success3 = update_version_define('PROJECT_VERSION_MINOR', str(minor))
+    success4 = update_version_define('PROJECT_VERSION_PATCH', str(patch))
+    success5 = update_build_date()
+    success6 = update_version_define('PROJECT_VERSION_SUFFIX', "")
+    success7 = update_version_define('PROJECT_VERSION_TAG', "")
+    success8 = update_git_info()
     
-    if success1 and success2 and success3 and success4 and success5 and success6:
+    if success1 and success2 and success3 and success4 and success5 and success6 and success7 and success8:
         print(f"✅ Version updated successfully to {new_version}")
         return True
     else:
         print("❌ Failed to update version")
         return False
-
-def update_build_number():
-    info = get_current_version_info()
-    if not info:
-        return False
-    
-    try:
-        current_build = int(info['build'] or 1)
-        new_build = str(current_build + 1)
-    except (ValueError, TypeError):
-        new_build = "1"
-    
-    success1 = update_version_define('PROJECT_BUILD', new_build)
-    success2 = update_version_define('PROJECT_BUILD_NUM', new_build, False)
-    success3 = update_build_date()
-    success4 = update_git_info()
-    
-    if success1 and success2 and success3 and success4:
-        print(f"✅ Build number updated: {info.get('build', 'N/A')} → {new_build}")
-        return new_build
-    return False
-
-def generate_snapshot_suffix():
-    """Генерирует уникальный суффикс для снапшотов на основе хэша коммита и времени"""
-    try:
-        # Пытаемся получить короткий хэш коммита
-        commit_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode().strip()
-        new_suffix = f"-SNAPSHOT.{commit_hash}"
-        new_tag = f"SNAPSHOT.{commit_hash}"
-        print(f"🔧 Using commit hash for snapshot: {commit_hash}")
-    except Exception as e:
-        # Fallback: используем timestamp
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M")
-        new_suffix = f"-SNAPSHOT.{timestamp}"
-        new_tag = f"SNAPSHOT.{timestamp}"
-        print(f"⚠️ Using timestamp for snapshot (git error: {e}): {timestamp}")
-    
-    return new_suffix, new_tag
 
 def update_version_suffix(suffix_type, number=""):
     info = get_current_version_info()
@@ -266,14 +431,9 @@ def update_version_suffix(suffix_type, number=""):
     if suffix_type == "release":
         new_suffix = ""
         new_tag = ""
-            
     elif suffix_type == "snapshot":
-        if number == "auto":
-            new_suffix, new_tag = generate_snapshot_suffix()
-        else:
-            new_suffix = f"-SNAPSHOT.{number}" if number else "-SNAPSHOT"
-            new_tag = f"SNAPSHOT.{number}" if number else "SNAPSHOT"
-        
+        new_suffix = f"-SNAPSHOT.{number}" if number else "-SNAPSHOT"
+        new_tag = f"SNAPSHOT.{number}" if number else "SNAPSHOT"
     elif suffix_type in ["alpha", "beta", "rc", "hotfix"]:
         new_suffix = f"-{suffix_type}.{number}" if number else f"-{suffix_type}.1"
         new_tag = f"{suffix_type.upper()}.{number}" if number else f"{suffix_type.upper()}.1"
@@ -299,24 +459,67 @@ def handle_command(args):
     
     command = args[0].lower()
     
-    if command in ['info', '-i']:
+    if command in ['build-mirgame', 'bm']:
+        result = update_build_number()
+        return result is not None
+        
+    elif command in ['decode-build', 'db']:
+        if len(args) > 1:
+            build_number = args[1]
+            decoded = decode_build_number(build_number)
+            if decoded:
+                print("🔍 Анализ номера сборки:")
+                print(f"   Полный номер: {build_number}")
+                print(f"   Мажорная версия: {decoded['major_version']}")
+                print(f"   Ветка: {decoded['branch_code']} ({decoded['branch_name']})")
+                print(f"   Счетчик сборки: {decoded['build_counter']}")
+                print(f"   Суффикс: {decoded['suffix']} ({decoded['suffix_name']})")
+                print(f"   Расшифровка: {decoded['full_decode']}")
+            else:
+                print("❌ Неверный формат номера сборки")
+        else:
+            info = get_current_version_info()
+            if info and info.get('build'):
+                decoded = decode_build_number(info['build'])
+                if decoded:
+                    print("🔍 Анализ текущей сборки:")
+                    for key, value in decoded.items():
+                        print(f"   {key.replace('_', ' ').title()}: {value}")
+            else:
+                print("❌ Номер сборки не найден")
+        return True
+        
+    elif command in ['build-history', 'bh']:
+        history = get_build_history()
+        print("📊 История сборок:")
+        print(f"   Мажорная версия: {history['major_version']}")
+        print(f"   Всего сборок: {history['total_builds']}")
+        print(f"   Последняя сборка: {history['last_build_date']}")
+        get_branch_stats()
+        return True
+        
+    elif command in ['branch-stats', 'bs']:
+        return get_branch_stats()
+    
+    elif command in ['info', '-i']:
         info = get_current_version_info()
         if info:
             full_version = f"{info['version'] or '0.1.0'}{info['suffix'] or ''}"
             
-            print("📋 Version Information:")
-            print(f"   Project: {info['name'] or 'MirGame Multi-Mod'}")
-            print(f"   Author: {info['author'] or 'MirGame'}")
-            print(f"   Version: {full_version}")
-            print(f"   Build: {info['build'] or '1'} (Num: {info.get('build_num', 'N/A')})")
-            print(f"   Date: {info['build_date'] or 'N/A'}")
-            print(f"   Suffix: '{info['suffix'] or ''}'")
-            print(f"   Tag: '{info.get('tag', 'N/A')}'")
+            print("📋 Информация о версии:")
+            print(f"   Проект: {info['name'] or 'MirGame Multi-Mod'}")
+            print(f"   Автор: {info['author'] or 'MirGame'}")
+            print(f"   Версия: {full_version}")
+            print(f"   Сборка: {info['build'] or '1'}")
+            print(f"   Дата: {info['build_date'] or 'N/A'}")
+            
+            if info.get('build') and len(info['build']) >= 7:
+                decoded = decode_build_number(info['build'])
+                if decoded:
+                    print(f"   Тип сборки: {decoded['suffix_name']}")
+                    print(f"   Ветка: {decoded['branch_name']}")
         return True
         
-    elif command in ['git-info', '-gi']:
-        return update_git_info()
-    
     elif command in ['major', '--major']:
         return increment_version("major")
         
@@ -374,6 +577,32 @@ def handle_command(args):
         print(f"❌ Unknown command: {command}")
         show_help()
         return False
+
+def show_help():
+    print("🚀 MirGame Build System - Система нумерации сборок")
+    print("Usage: python update_version.py [COMMAND] [OPTIONS]")
+    print("\n📋 Поддерживаемые ветки:")
+    print("  main, dev, hotfix/*, alpha/*, beta/*, rc/*, feature/*, bugfix/*")
+    print("\n🔧 Команды системы сборок:")
+    print("  build-mirgame (bm)       Генерировать номер сборки MirGame")
+    print("  decode-build (db) [NUM]  Расшифровать номер сборки")
+    print("  build-history (bh)       Показать историю сборок")
+    print("  branch-stats (bs)        Статистика по веткам")
+    print("\n🔄 Стандартные команды версий:")
+    print("  info                     Показать информацию о версии")
+    print("  major                    Увеличить мажорную версию (X.0.0)")
+    print("  minor                    Увеличить минорную версию (0.Y.0)")  
+    print("  patch                    Увеличить патч версию (0.0.Z)")
+    print("  build                    Увеличить номер сборки")
+    print("  snapshot [N]             Установить SNAPSHOT.N суффикс")
+    print("  release                  Убрать суффикс для финального релиза")
+    print("  alpha [N]                Установить alpha.N суффикс")
+    print("  beta [N]                 Установить beta.N суффикс")
+    print("  rc [N]                   Установить rc.N суффикс")
+    print("  hotfix [N]               Установить hotfix.N суффикс")
+    print("  get-version              Получить базовую версию (X.Y.Z)")
+    print("  get-suffix               Получить суффикс версии")
+    print("  get-full-version         Получить полную версию с суффиксом")
 
 if __name__ == "__main__":
     try:
