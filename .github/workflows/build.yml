@@ -3,26 +3,19 @@ name: AMXX Build System
 on:
   push:
     branches: [main, dev, hotfix/*, alpha/*, beta/*, rc/*, feature/*, bugfix/*]
-  pull_request:
-    branches: [main, dev]
-  release:
-    types: [published]
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚀 Checkout code (with full history)
+      - name: 🚀 Checkout code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           fetch-depth: 0
 
-      - name: 📦 Install system dependencies
+      - name: 📦 Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libc6-i386 lib32stdc++6 lib32z1 lib32gcc-s1 wget tar
@@ -32,78 +25,94 @@ jobs:
           wget -q https://github.com/NightMira/amxmodx_1-9/releases/download/v1.9/amxmodx19.tar
           tar -xf amxmodx19.tar
           chmod +x amxxpc
-          ./amxxpc --help || true
 
       - name: 🏷️ Generate build number
-        id: generate-build
+        id: build-number
         run: |
           # Генерируем номер сборки
           python3 update_version.py build-mirgame
           
-          # Извлекаем номер ПРЯМО из файла
-          MIRGAME_BUILD=$(sed -n 's/^#define PROJECT_BUILD "\([^"]*\)"/\1/p' scripting/include/version.inc)
+          # ДИАГНОСТИКА: Проверяем что файл существует и содержит номер
+          echo "🔍 Проверка version.inc:"
+          cat scripting/include/version.inc | grep PROJECT_BUILD
           
-          # Проверяем что номер получен
-          if [ -z "$MIRGAME_BUILD" ]; then
-            echo "❌ Failed to extract build number"
-            exit 1
+          # Извлекаем номер сборки РАЗНЫМИ способами
+          MIRGAME_BUILD=$(grep 'PROJECT_BUILD' scripting/include/version.inc | awk -F '"' '{print $2}')
+          MIRGAME_BUILD_ALT=$(sed -n 's/^#define PROJECT_BUILD "\([^"]*\)"/\1/p' scripting/include/version.inc)
+          
+          echo "📝 Номер сборки (grep): $MIRGAME_BUILD"
+          echo "📝 Номер сборки (sed): $MIRGAME_BUILD_ALT"
+          
+          # Используем первый непустой вариант
+          if [ -n "$MIRGAME_BUILD" ]; then
+            FINAL_BUILD="$MIRGAME_BUILD"
+          elif [ -n "$MIRGAME_BUILD_ALT" ]; then
+            FINAL_BUILD="$MIRGAME_BUILD_ALT"
+          else
+            FINAL_BUILD="00U0001x"
           fi
           
-          # Устанавливаем переменные
-          echo "BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
-          echo "build_number=$MIRGAME_BUILD" >> $GITHUB_OUTPUT
+          echo "✅ Финальный номер сборки: $FINAL_BUILD"
           
-          echo "✅ Build number: $MIRGAME_BUILD"
+          # Устанавливаем переменные
+          echo "MIRGAME_BUILD_NUMBER=$FINAL_BUILD" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=$FINAL_BUILD" >> $GITHUB_ENV
+          echo "build_number=$FINAL_BUILD" >> $GITHUB_OUTPUT
 
-      - name: 📊 Debug information
-        if: always()
+      - name: 🔍 Debug variables
         run: |
-          echo "Build number from env: $BUILD_NUMBER"
-          echo "Build number from output: ${{ steps.generate-build.outputs.build_number }}"
+          echo "🔍 Проверка переменных:"
+          echo "BUILD_NUMBER: $BUILD_NUMBER"
+          echo "MIRGAME_BUILD_NUMBER: $MIRGAME_BUILD_NUMBER"
+          echo "GITHUB_OUTPUT build_number: ${{ steps.build-number.outputs.build_number }}"
+          
+          # Проверяем что переменные не пустые
+          if [ -z "$BUILD_NUMBER" ]; then
+            echo "❌ ОШИБКА: BUILD_NUMBER пустая!"
+            exit 1
+          else
+            echo "✅ BUILD_NUMBER установлена: $BUILD_NUMBER"
+          fi
 
-      - name: 🏗️ Compile all plugins
+      - name: 🔍 Analyze build
+        run: |
+          echo "🔍 Анализ номера сборки:"
+          python3 update_version.py decode-build
+
+      - name: 🏗️ Compile plugins
         run: |
           mkdir -p compiled
           chmod +x compile.sh
           ./compile.sh
 
-      - name: 📦 Upload artifacts with MirGame naming
+      - name: 📦 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: amxx-plugins-${{ env.MIRGAME_BUILD_NUMBER }}
+          name: amxx-plugins-${{ env.BUILD_NUMBER }}
           path: |
             compiled/*.amxx
             compile.log
-            scripting/include/version.inc
           retention-days: 30
 
       - name: 📋 Create build summary
         run: |
-          FULL_VERSION=$(python3 update_version.py get-full-version)
-          BUILD_INFO=$(python3 update_version.py info)
-          COMPILE_RESULT=$(tail -10 compile.log | grep -E "✅|❌|⚠️" || echo "No compilation results found")
-          
           echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Build Information" >> $GITHUB_STEP_SUMMARY
           echo "- **Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Number:** ${{ env.MIRGAME_BUILD_NUMBER }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Number:** ${{ env.BUILD_NUMBER }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** 0.0.6" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact:** amxx-plugins-${{ env.MIRGAME_BUILD_NUMBER }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact:** amxx-plugins-${{ env.BUILD_NUMBER }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### 📋 Version Details" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "$BUILD_INFO" >> $GITHUB_STEP_SUMMARY
+          python3 update_version.py info >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### 🔧 Compilation Results" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "$COMPILE_RESULT" >> $GITHUB_STEP_SUMMARY
+          tail -10 compile.log | grep -E "✅|❌|⚠️|Compilation summary:" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
