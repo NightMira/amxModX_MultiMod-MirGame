@@ -191,50 +191,100 @@ jobs:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         run: |
           echo "### 🔍 Manual Sync" >> $GITHUB_STEP_SUMMARY
-          echo "📦 Syncing all open items..." >> $GITHUB_STEP_SUMMARY
+          echo "📦 Syncing all open items from ALL repositories..." >> $GITHUB_STEP_SUMMARY
           
-          # Получаем node_id репозитория
-          REPO_NODE_ID=$(gh api graphql -f query='
-            query($owner: String!, $repo: String!) {
-              repository(owner: $owner, name: $repo) {
-                id
-              }
-            }' -f owner="$USER" -f repo="${{ github.event.repository.name }}" --jq '.data.repository.id')
-          
-          # Синхронизация issues
-          gh issue list --state open --json number,title --jq '.[] | @text' | while read -r issue; do
-            number=$(echo "$issue" | jq -r '.number')
+          # Функция для добавления элемента в проект
+          add_to_project() {
+            local content_id="$1"
+            local item_type="$2"
+            local number="$3"
+            local repo="$4"
             
-            # Получаем node_id issue
-            issue_node_id=$(gh api graphql -f query='
-              query($repo: ID!, $number: Int!) {
-                node(id: $repo) {
-                  ... on Repository {
-                    issue(number: $number) {
-                      id
+            item_id=$(gh api graphql -f query='
+              mutation($project:ID!, $content:ID!) {
+                addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
+                  item {
+                    id
+                  }
+                }
+              }' -f project="$PROJECT_ID" -f content="$content_id" --jq '.data.addProjectV2ItemById.item.id' 2>/dev/null)
+            
+            if [ -n "$item_id" ] && [ "$item_id" != "null" ]; then
+              echo "✅ $item_type #$number from $repo" >> $GITHUB_STEP_SUMMARY
+              
+              # Устанавливаем статус "Todo" для новых элементов
+              if [ -n "$STATUS_FIELD_ID" ] && [ -n "$TODO_OPTION_ID" ]; then
+                gh api graphql -f query='
+                  mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $project
+                      itemId: $item
+                      fieldId: $field
+                      value: {
+                        singleSelectOptionId: $value
+                      }
+                    }) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }' -f project="$PROJECT_ID" -f item="$item_id" -f field="$STATUS_FIELD_ID" -f value="$TODO_OPTION_ID" --silent 2>/dev/null
+              fi
+            else
+              echo "⚠️ $item_type #$number from $repo (already in project)" >> $GITHUB_STEP_SUMMARY
+            fi
+          }
+          
+          # Получаем ВСЕ issues пользователя NightMira
+          echo "🔍 Fetching all open issues..." >> $GITHUB_STEP_SUMMARY
+          gh api graphql -f query='
+            query($user: String!) {
+              user(login: $user) {
+                issues(first: 50, states: OPEN) {
+                  nodes {
+                    number
+                    id
+                    title
+                    repository {
+                      name
                     }
                   }
                 }
-              }' -f repo="$REPO_NODE_ID" -f number="$number" --jq '.data.node.issue.id')
+              }
+            }' -f user="$USER" > issues.json
+          
+          jq -c '.data.user.issues.nodes[]' issues.json | while read -r issue; do
+            number=$(echo "$issue" | jq -r '.number')
+            id=$(echo "$issue" | jq -r '.id')
+            repo=$(echo "$issue" | jq -r '.repository.name')
             
-            if [ -n "$issue_node_id" ] && [ "$issue_node_id" != "null" ]; then
-              gh api graphql -f query='
-                mutation($project:ID!, $content:ID!) {
-                  addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
-                    item {
-                      id
+            add_to_project "$id" "Issue" "$number" "$repo"
+          done
+          
+          # Получаем ВСЕ PR пользователя NightMira
+          echo "🔍 Fetching all open PRs..." >> $GITHUB_STEP_SUMMARY
+          gh api graphql -f query='
+            query($user: String!) {
+              user(login: $user) {
+                pullRequests(first: 50, states: OPEN) {
+                  nodes {
+                    number
+                    id
+                    title
+                    repository {
+                      name
                     }
                   }
-                }' -f project="$PROJECT_ID" -f content="$issue_node_id" --silent
-              
-              if [ $? -eq 0 ]; then
-                echo "✅ Issue #$number" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "⚠️ Issue #$number" >> $GITHUB_STEP_SUMMARY
-              fi
-            else
-              echo "❌ Failed to get node_id for Issue #$number" >> $GITHUB_STEP_SUMMARY
-            fi
+                }
+              }
+            }' -f user="$USER" > prs.json
+          
+          jq -c '.data.user.pullRequests.nodes[]' prs.json | while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            id=$(echo "$pr" | jq -r '.id')
+            repo=$(echo "$pr" | jq -r '.repository.name')
+            
+            add_to_project "$id" "PR" "$number" "$repo"
           done
           
           echo "✅ Manual sync completed!" >> $GITHUB_STEP_SUMMARY
