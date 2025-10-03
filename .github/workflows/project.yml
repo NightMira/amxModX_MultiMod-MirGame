@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "🔄 Processing closed item..." >> $GITHUB_STEP_SUMMARY
           
-          # Получаем данные проекта
+          # Получаем данные проекта с правильными типами
           gh api graphql -f query='
             query($user: String!, $number: Int!) {
               user(login: $user) {
@@ -43,6 +43,11 @@ jobs:
                   id
                   fields(first:20) {
                     nodes {
+                      ... on ProjectV2Field {
+                        id
+                        name
+                        dataType
+                      }
                       ... on ProjectV2SingleSelectField {
                         id
                         name
@@ -58,17 +63,18 @@ jobs:
             }' -f user="NightMira" -F number=3 > project_data.json
           
           PROJECT_ID=$(jq -r '.data.user.projectV2.id' project_data.json)
-          STATUS_FIELD_ID=$(jq -r '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .id' project_data.json)
-          DONE_OPTION_ID=$(jq -r '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Done") | .id' project_data.json)
+          STATUS_FIELD_ID=$(jq -r '.data.user.projectV2.fields.nodes[] | select(.name=="Status" and .dataType=="SINGLE_SELECT") | .id' project_data.json)
+          DONE_OPTION_ID=$(jq -r '.data.user.projectV2.fields.nodes[] | select(.name=="Status" and .dataType=="SINGLE_SELECT") | .options[] | select(.name=="Done") | .id' project_data.json)
           
           if [ -n "$STATUS_FIELD_ID" ] && [ -n "$DONE_OPTION_ID" ]; then
-            # Находим item в проекте и обновляем статус
+            # Определяем content ID в зависимости от типа события
             if [ "${{ github.event_name }}" = "issues" ]; then
               CONTENT_ID="${{ github.event.issue.node_id }}"
             else
               CONTENT_ID="${{ github.event.pull_request.node_id }}"
             fi
             
+            # Находим item в проекте
             ITEM_ID=$(gh api graphql -f query='
               query($project: ID!, $content: ID!) {
                 node(id: $project) {
@@ -89,9 +95,10 @@ jobs:
                   }
                 }
               }' -f project="$PROJECT_ID" -f content="$CONTENT_ID" \
-              --jq '.data.node.items.nodes[] | select(.content.id == $content) | .id')
+              --jq ".data.node.items.nodes[] | select(.content.id == \"$CONTENT_ID\") | .id")
             
             if [ -n "$ITEM_ID" ]; then
+              # Обновляем статус используя правильную мутацию
               gh api graphql -f query='
                 mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
                   updateProjectV2ItemFieldValue(input: {
@@ -108,8 +115,18 @@ jobs:
                   }
                 }' -f project="$PROJECT_ID" -f item="$ITEM_ID" -f field="$STATUS_FIELD_ID" -f value="$DONE_OPTION_ID" --silent
               
-              echo "✅ Status updated to Done" >> $GITHUB_STEP_SUMMARY
+              if [ $? -eq 0 ]; then
+                echo "✅ Status updated to Done for item $ITEM_ID" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "❌ Failed to update status" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "⚠️ Item not found in project for content $CONTENT_ID" >> $GITHUB_STEP_SUMMARY
             fi
+          else
+            echo "⚠️ Status field or Done option not found" >> $GITHUB_STEP_SUMMARY
+            echo "Status Field ID: $STATUS_FIELD_ID" >> $GITHUB_STEP_SUMMARY
+            echo "Done Option ID: $DONE_OPTION_ID" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Manual bulk sync
@@ -120,7 +137,7 @@ jobs:
           echo "### 🔍 Manual Bulk Sync" >> $GITHUB_STEP_SUMMARY
           echo "📦 Adding all open issues and PRs to project..." >> $GITHUB_STEP_SUMMARY
           
-          # Получаем PROJECT_ID (аналогично add-to-project action)
+          # Получаем PROJECT_ID
           gh api graphql -f query='
             query($user: String!, $number: Int!) {
               user(login: $user) {
@@ -132,52 +149,37 @@ jobs:
           
           PROJECT_ID=$(jq -r '.data.user.projectV2.id' project_data.json)
           
-          # Функция для добавления в проект (аналогично action)
+          # Функция для добавления в проект с правильными типами
           add_to_project() {
             local content_id="$1"
             local item_type="$2"
             local number="$3"
             local title="$4"
             
-            # Используем тот же подход что и в add-to-project
-            gh api graphql -f query='
+            # Используем правильную мутацию addProjectV2ItemById
+            result=$(gh api graphql -f query='
               mutation($projectId: ID!, $contentId: ID!) {
                 addProjectV2ItemById(input: {
                   projectId: $projectId,
                   contentId: $contentId
                 }) {
-                  item {
+                  projectV2Item {
                     id
                   }
                 }
-              }' -f projectId="$PROJECT_ID" -f contentId="$content_id" --silent 2>/dev/null
+              }' -f projectId="$PROJECT_ID" -f contentId="$content_id" --silent 2>&1)
             
             if [ $? -eq 0 ]; then
               echo "✅ $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
               return 0
             else
-              # Если не удалось добавить напрямую, пробуем как draft issue
-              gh api graphql -f query='
-                mutation($projectId: ID!, $title: String!) {
-                  addProjectV2DraftIssue(input: {
-                    projectId: $projectId,
-                    title: $title
-                  }) {
-                    projectItem {
-                      id
-                    }
-                  }
-                }' -f projectId="$PROJECT_ID" -f title="$title" --silent 2>/dev/null
-              
-              if [ $? -eq 0 ]; then
-                echo "✅ $item_type #$number (as draft): $title" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "⚠️ $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
-              fi
+              echo "⚠️ Failed to add $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
+              echo "Error: $result" >> $GITHUB_STEP_SUMMARY
+              return 1
             fi
           }
           
-          # Получаем issues через GraphQL API
+          # Получаем issues через GraphQL API с правильными типами
           echo "🔍 Processing issues..." >> $GITHUB_STEP_SUMMARY
           gh api graphql -f query='
             query($owner: String!, $repo: String!) {
@@ -187,26 +189,29 @@ jobs:
                     number
                     id
                     title
-                    url
+                    state
                   }
                 }
               }
-            }' -f owner="NightMira" -f repo="${{ github.event.repository.name }}" > issues.json
+            }' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" > issues.json
           
           added_count=0
-          jq -c '.data.repository.issues.nodes[]' issues.json | while read -r issue; do
-            number=$(echo "$issue" | jq -r '.number')
-            id=$(echo "$issue" | jq -r '.id')
-            title=$(echo "$issue" | jq -r '.title | sub("^(.{80}).*$"; "$1...")')
-            url=$(echo "$issue" | jq -r '.url')
-            
-            add_to_project "$id" "Issue" "$number" "$title"
-            if [ $? -eq 0 ]; then
-              added_count=$((added_count + 1))
+          while IFS= read -r issue; do
+            if [ -n "$issue" ]; then
+              number=$(echo "$issue" | jq -r '.number')
+              id=$(echo "$issue" | jq -r '.id')
+              title=$(echo "$issue" | jq -r '.title' | head -c 80)
+              state=$(echo "$issue" | jq -r '.state')
+              
+              if [ "$state" = "OPEN" ]; then
+                if add_to_project "$id" "Issue" "$number" "$title"; then
+                  added_count=$((added_count + 1))
+                fi
+              fi
             fi
-          done
+          done < <(jq -c '.data.repository.issues.nodes[]' issues.json)
           
-          # Получаем PRs через GraphQL API
+          # Получаем PRs через GraphQL API с правильными типами
           echo "🔍 Processing PRs..." >> $GITHUB_STEP_SUMMARY
           gh api graphql -f query='
             query($owner: String!, $repo: String!) {
@@ -216,22 +221,25 @@ jobs:
                     number
                     id
                     title
-                    url
+                    state
                   }
                 }
               }
-            }' -f owner="NightMira" -f repo="${{ github.event.repository.name }}" > prs.json
+            }' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" > prs.json
           
-          jq -c '.data.repository.pullRequests.nodes[]' prs.json | while read -r pr; do
-            number=$(echo "$pr" | jq -r '.number')
-            id=$(echo "$pr" | jq -r '.id')
-            title=$(echo "$pr" | jq -r '.title | sub("^(.{80}).*$"; "$1...")')
-            url=$(echo "$pr" | jq -r '.url')
-            
-            add_to_project "$id" "PR" "$number" "$title"
-            if [ $? -eq 0 ]; then
-              added_count=$((added_count + 1))
+          while IFS= read -r pr; do
+            if [ -n "$pr" ]; then
+              number=$(echo "$pr" | jq -r '.number')
+              id=$(echo "$pr" | jq -r '.id')
+              title=$(echo "$pr" | jq -r '.title' | head -c 80)
+              state=$(echo "$pr" | jq -r '.state')
+              
+              if [ "$state" = "OPEN" ]; then
+                if add_to_project "$id" "PR" "$number" "$title"; then
+                  added_count=$((added_count + 1))
+                fi
+              fi
             fi
-          done
+          done < <(jq -c '.data.repository.pullRequests.nodes[]' prs.json)
           
           echo "🎯 Manual sync completed! Added $added_count items to project." >> $GITHUB_STEP_SUMMARY
