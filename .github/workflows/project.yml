@@ -20,19 +20,6 @@ jobs:
       - name: 🚀 Checkout code
         uses: actions/checkout@v4
 
-      - name: 📦 Setup GitHub CLI
-        run: |
-          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update
-          sudo apt install gh -y
-
-      - name: 🔑 Authenticate GitHub CLI
-        run: |
-          echo "${{ secrets.PRIVATE_REPO_TOKEN }}" | gh auth login --with-token
-
       - name: 📊 Get project data
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -41,7 +28,6 @@ jobs:
         run: |
           echo "## 🗂️ Project Automation" >> $GITHUB_STEP_SUMMARY
           
-          # ИСПРАВЛЕНО: используем -F для числовых переменных
           gh api graphql -f query='
             query($user: String!, $number: Int!) {
               user(login: $user) {
@@ -68,15 +54,15 @@ jobs:
               }
             }' -f user="$USER" -F number="$PROJECT_NUMBER" > project_data.json
 
-          echo 'PROJECT_ID='$(jq '.data.user.projectV2.id' project_data.json) >> $GITHUB_ENV
-          echo 'PROJECT_TITLE='$(jq -r '.data.user.projectV2.title' project_data.json) >> $GITHUB_ENV
+          echo "PROJECT_ID=$(jq '.data.user.projectV2.id' project_data.json)" >> $GITHUB_ENV
+          echo "PROJECT_TITLE='$(jq -r '.data.user.projectV2.title' project_data.json) >> $GITHUB_ENV
           
           # Поля для статуса
           STATUS_FIELD_ID=$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .id' project_data.json)
           if [ "$STATUS_FIELD_ID" != "null" ] && [ -n "$STATUS_FIELD_ID" ]; then
-            echo 'STATUS_FIELD_ID='$STATUS_FIELD_ID >> $GITHUB_ENV
-            echo 'TODO_OPTION_ID='$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") | .id' project_data.json) >> $GITHUB_ENV
-            echo 'DONE_OPTION_ID='$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Done") | .id' project_data.json) >> $GITHUB_ENV
+            echo "STATUS_FIELD_ID='$STATUS_FIELD_ID" >> $GITHUB_ENV
+            echo "TODO_OPTION_ID='$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") | .id' project_data.json)" >> $GITHUB_ENV
+            echo "DONE_OPTION_ID=$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Done") | .id' project_data.json)" >> $GITHUB_ENV
           fi
 
           echo "📊 Project: $PROJECT_TITLE" >> $GITHUB_STEP_SUMMARY
@@ -98,7 +84,6 @@ jobs:
 
           echo "🎯 Adding $ITEM_TYPE #$ITEM_NUMBER to project..." >> $GITHUB_STEP_SUMMARY
 
-          # ИСПРАВЛЕНО: правильные флаги для переменных
           item_id=$(gh api graphql -f query='
             mutation($project:ID!, $content:ID!) {
               addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
@@ -108,7 +93,7 @@ jobs:
               }
             }' -f project="$PROJECT_ID" -f content="$CONTENT_ID" --jq '.data.addProjectV2ItemById.item.id')
 
-          echo 'ITEM_ID='$item_id >> $GITHUB_ENV
+          echo ITEM_ID=$item_id >> $GITHUB_ENV
           echo "✅ Added to project!" >> $GITHUB_STEP_SUMMARY
 
       - name: 🔄 Update item status (closed items)
@@ -182,7 +167,6 @@ jobs:
           echo "DATE=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
           
           if [ -n "$STATUS_FIELD_ID" ] && [ -n "$TODO_OPTION_ID" ]; then
-            # ИСПРАВЛЕНО: правильные флаги
             gh api graphql -f query='
               mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
                 updateProjectV2ItemFieldValue(input: {
@@ -210,14 +194,14 @@ jobs:
           echo "📦 Syncing all open items..." >> $GITHUB_STEP_SUMMARY
           
           # Синхронизация issues (простой способ через gh cli)
-          gh issue list --state open --limit 30 --json number,title,url | jq -c '.[]' | while read item; do
+          gh issue list --state open --json number,title,url | jq -c '.[]' | while read item; do
             number=$(echo "$item" | jq -r '.number')
             url=$(echo "$item" | jq -r '.url')
             gh project item-add 3 --owner NightMira --url "$url" 2>/dev/null && echo "✅ Issue #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ Issue #$number" >> $GITHUB_STEP_SUMMARY
           done
           
           # Синхронизация PR
-          gh pr list --state open --limit 30 --json number,title,url | jq -c '.[]' | while read item; do
+          gh pr list --state open --json number,title,url | jq -c '.[]' | while read item; do
             number=$(echo "$item" | jq -r '.number')
             url=$(echo "$item" | jq -r '.url')
             gh project item-add 3 --owner NightMira --url "$url" 2>/dev/null && echo "✅ PR #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ PR #$number" >> $GITHUB_STEP_SUMMARY
@@ -233,8 +217,3 @@ jobs:
           echo "- **Project:** $PROJECT_TITLE" >> $GITHUB_STEP_SUMMARY
           echo "- **Timestamp:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
           echo "- **Result:** ✅ Automation completed" >> $GITHUB_STEP_SUMMARY
-
-      - name: 🧹 Cleanup
-        if: always()
-        run: |
-          gh auth logout || true
