@@ -38,9 +38,9 @@
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
 // Git Commit Information - ✅ Обновляется автоматически
-#define PROJECT_COMMIT_HASH "2d4aa8655268ccfa949375dd393bb17f7d40659b"
-#define PROJECT_COMMIT_SHORT_HASH "2d4aa86"
-#define PROJECT_COMMIT_AUTHOR "NightMira"
+#define PROJECT_COMMIT_HASH "3c045469db678d413cdfeee6b451c6584adb475f"
+#define PROJECT_COMMIT_SHORT_HASH "3c04546"
+#define PROJECT_COMMIT_AUTHOR "MirGame"
 #define PROJECT_COMMIT_DATE "2025-10-03"
 
 /* ========================================================================== */
