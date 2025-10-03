@@ -156,14 +156,14 @@ jobs:
             local number="$3"
             local title="$4"
             
-            # Используем правильную мутацию addProjectV2ItemById
+            # Используем правильную мутацию addProjectV2ItemById с полем 'item'
             result=$(gh api graphql -f query='
               mutation($projectId: ID!, $contentId: ID!) {
                 addProjectV2ItemById(input: {
                   projectId: $projectId,
                   contentId: $contentId
                 }) {
-                  projectV2Item {
+                  item {
                     id
                   }
                 }
@@ -173,9 +173,15 @@ jobs:
               echo "✅ $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
               return 0
             else
-              echo "⚠️ Failed to add $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
-              echo "Error: $result" >> $GITHUB_STEP_SUMMARY
-              return 1
+              # Если элемент уже существует, это нормально
+              if echo "$result" | grep -q "already exists"; then
+                echo "ℹ️  $item_type #$number already in project: $title" >> $GITHUB_STEP_SUMMARY
+                return 0
+              else
+                echo "⚠️ Failed to add $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
+                echo "Error: $result" >> $GITHUB_STEP_SUMMARY
+                return 1
+              fi
             fi
           }
           
