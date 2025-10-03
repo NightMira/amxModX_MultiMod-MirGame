@@ -12,32 +12,36 @@
 #define PROJECT_AUTHOR              "MirGame"
 #define PROJECT_DESCRIPTION         "Advanced AMXX Modification Framework"
 
-// Semantic Versioning (SemVer)
+// Semantic Versioning (SemVer) - ✅ В репозитории (управляется вручную)
 #define PROJECT_VERSION_MAJOR "0"
 #define PROJECT_VERSION_MAJOR_NUM 0
 #define PROJECT_VERSION_MINOR "0"
 #define PROJECT_VERSION_MINOR_NUM 0
-#define PROJECT_VERSION_PATCH "5"
-#define PROJECT_VERSION_PATCH_NUM 5
-#define PROJECT_VERSION "0.0.5"
-#define PROJECT_VERSION_NUM 5
+#define PROJECT_VERSION_PATCH "6"
+#define PROJECT_VERSION_PATCH_NUM 6
+#define PROJECT_VERSION "0.0.6"
+#define PROJECT_VERSION_NUM 6
 
-// Version Suffix (Pre-release tags)
-#define PROJECT_VERSION_TAG "SNAPSHOT.a8a50b2"
-#define PROJECT_VERSION_SUFFIX "-SNAPSHOT.a8a50b2"
+// Version Suffix (Pre-release tags) - ✅ В репозитории (управляется вручную)
+#define PROJECT_VERSION_TAG ""
+#define PROJECT_VERSION_SUFFIX ""
 
-// Build Information
-#define PROJECT_BUILD "130"
-#define PROJECT_BUILD_NUM 130
-#define PROJECT_BUILD_DATE "2025-09-20"
+// MirGame Build System Information - ❌ Генерируется автоматически в CI
+// Эти поля будут перезаписаны при сборке в GitHub Actions
+#define PROJECT_BUILD "00D0004l"      // Автоматически: 00D0002d
+#define PROJECT_BUILD_NUM 4               // Автоматически: 2
+#define PROJECT_BUILD_TYPE "local"         // Автоматически: ci/developer/release
+#define PROJECT_BRANCH_CODE "D"             // Автоматически: R/D/F/H/A/B/C/X
+#define PROJECT_BUILD_SUFFIX "l"             // Автоматически: c/d/r/i/b
+#define PROJECT_BUILD_DATE "2025-10-03"
 #define PROJECT_BUILD_TIME          __TIME__
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
-// Git Commit Information
-#define PROJECT_COMMIT_HASH "a8a50b2df3f0a6b701382d0809238367384a8d7e"
-#define PROJECT_COMMIT_SHORT_HASH "a8a50b2"
+// Git Commit Information - ✅ Обновляется автоматически
+#define PROJECT_COMMIT_HASH "3c045469db678d413cdfeee6b451c6584adb475f"
+#define PROJECT_COMMIT_SHORT_HASH "3c04546"
 #define PROJECT_COMMIT_AUTHOR "MirGame"
-#define PROJECT_COMMIT_DATE "2025-09-20"
+#define PROJECT_COMMIT_DATE "2025-10-03"
 
 /* ========================================================================== */
 /*                            COMPATIBILITY MACROS                            */

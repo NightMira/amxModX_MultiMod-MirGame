@@ -1,0 +1,21 @@
+#!/bin/bash
+echo "🔧 Pre-commit: Updating version.inc..."
+
+# Обновляем git информацию
+if python3 update_version.py git-info; then
+    git add scripting/include/version.inc
+    echo "✅ version.inc updated with git information"
+else
+    echo "❌ Failed to update version.inc"
+    exit 1
+fi
+
+# Дополнительные проверки
+echo "🔍 Running validations..."
+if ! python3 update_version.py validate 2>/dev/null; then
+    echo "⚠️ Version consistency issues detected"
+    echo "   Run: python3 update_version.py validate for details"
+fi
+
+echo "✅ Pre-commit checks completed"
+exit 0

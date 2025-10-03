@@ -28,7 +28,7 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
       - name: 🏷️ Auto-label new issues and PRs
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.retroactive == 'false' }}
+        if: ${{ github.event_name != 'workflow_dispatch' || (github.event_name == 'workflow_dispatch' && github.event.inputs.retroactive == false) }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PRIVATE_REPO_TOKEN }}
@@ -262,7 +262,7 @@ jobs:
             }
 
       - name: 🔍 Process existing issues and PRs
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.retroactive == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.retroactive == true }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PRIVATE_REPO_TOKEN }}

@@ -2,7 +2,7 @@ name: AMXX Build System
 
 on:
   push:
-    branches: [main, dev, pre-release/alpha/*, pre-release/beta/*, pre-release/rc/*, hotfix/*]
+    branches: [main, dev, hotfix/*, alpha/*, beta/*, rc/*, feature/*, bugfix/*]
   pull_request:
     branches: [main, dev]
   release:
@@ -20,7 +20,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          fetch-depth: 0  # Важно: получаем полную историю
+          fetch-depth: 0
+
+      - name: 📥 Cache build history
+        uses: actions/cache@v3
+        id: build-history-cache
+        with:
+          path: .build_history.json
+          key: build-history-${{ github.ref }}-${{ github.run_id }}
+          restore-keys: |
+            build-history-${{ github.ref }}-
 
       - name: 📦 Install system dependencies
         run: |
@@ -34,127 +43,19 @@ jobs:
           chmod +x amxxpc
           ./amxxpc --help || true
 
-      - name: 🏷️ Determine version based on branch (FIXED for merge)
+      - name: 🏷️ Generate build number
+        id: build-number
         run: |
-          # Улучшенное определение ветки для merge-коммитов
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Для PR используем базовую ветку
-            BRANCH_NAME="${{ github.base_ref }}"
-            echo "📋 PR detected, using base ref: $BRANCH_NAME"
-          else
-            # Для push получаем ветку из ref
-            BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-            
-            # Если это тег, используем main
-            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-              BRANCH_NAME="main"
-              echo "📋 Tag detected, using branch: main"
-            fi
-            
-            # Обработка merge-коммитов
-            if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "merge" ] || [[ "$BRANCH_NAME" == *"/merge" ]]; then
-              echo "⚠️ Merge commit detected, detecting target branch..."
-              
-              # Метод 1: из сообщения коммита
-              BRANCH_NAME=$(git log -1 --pretty=%B | grep -o 'Merge branch.*into' | awk '{print $3}' || echo "")
-              
-              # Метод 2: альтернативный формат
-              if [ -z "$BRANCH_NAME" ]; then
-                BRANCH_NAME=$(git log -1 --pretty=%B | grep -o 'from.*' | cut -d' ' -f2 || echo "")
-              fi
-              
-              # Метод 3: из remote веток
-              if [ -z "$BRANCH_NAME" ]; then
-                BRANCH_NAME=$(git branch -r --contains HEAD | grep -v "HEAD" | head -1 | sed 's/origin\///' | xargs)
-              fi
-              
-              # Метод 4: fallback на dev
-              if [ -z "$BRANCH_NAME" ]; then
-                BRANCH_NAME="dev"
-                echo "⚠️ Could not detect branch, using fallback: dev"
-              else
-                echo "📋 Detected target branch from merge: $BRANCH_NAME"
-              fi
-            fi
-          fi
-          
-          # Очистка имени ветки
-          BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/^refs\/heads\///' | sed 's/^origin\///')
-          echo "📋 Final branch name: $BRANCH_NAME"
-          
-          CURRENT_VERSION=$(python3 update_version.py get-version)
-          CURRENT_SUFFIX=$(python3 update_version.py get-suffix)
-          
-          if [[ "$BRANCH_NAME" == "main" ]]; then
-            echo "VERSION_STRATEGY=release" >> $GITHUB_ENV
-            echo "ARTIFACT_SUFFIX=stable" >> $GITHUB_ENV
-            echo "VERSION_CMD=release" >> $GITHUB_ENV
-            
-          elif [[ "$BRANCH_NAME" == "dev" ]]; then
-            echo "VERSION_STRATEGY=snapshot" >> $GITHUB_ENV
-            echo "ARTIFACT_SUFFIX=dev" >> $GITHUB_ENV
-            echo "VERSION_CMD=snapshot auto" >> $GITHUB_ENV
-            
-          elif [[ "$BRANCH_NAME" =~ ^pre-release/alpha/ ]]; then
-            ALPHA_NUM="${BRANCH_NAME##*/}"
-            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
-            echo "ARTIFACT_SUFFIX=alpha-$ALPHA_NUM" >> $GITHUB_ENV
-            echo "VERSION_CMD=alpha $ALPHA_NUM" >> $GITHUB_ENV
-            
-          elif [[ "$BRANCH_NAME" =~ ^pre-release/beta/ ]]; then
-            BETA_NUM="${BRANCH_NAME##*/}"
-            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
-            echo "ARTIFACT_SUFFIX=beta-$BETA_NUM" >> $GITHUB_ENV
-            echo "VERSION_CMD=beta $BETA_NUM" >> $GITHUB_ENV
-            
-          elif [[ "$BRANCH_NAME" =~ ^pre-release/rc/ ]]; then
-            RC_NUM="${BRANCH_NAME##*/}"
-            echo "VERSION_STRATEGY=pre-release" >> $GITHUB_ENV
-            echo "ARTIFACT_SUFFIX=rc-$RC_NUM" >> $GITHUB_ENV
-            echo "VERSION_CMD=rc $RC_NUM" >> $GITHUB_ENV
-            
-          elif [[ "$BRANCH_NAME" =~ ^hotfix/ ]]; then
-            HOTFIX_NUM=$(echo "$BRANCH_NAME" | grep -o '[0-9]*$' || echo "1")
-            echo "VERSION_STRATEGY=hotfix" >> $GITHUB_ENV
-            echo "ARTIFACT_SUFFIX=hotfix-$HOTFIX_NUM" >> $GITHUB_ENV
-            echo "VERSION_CMD=patch && hotfix $HOTFIX_NUM" >> $GITHUB_ENV
-            
-          else
-            echo "VERSION_STRATEGY=keep" >> $GITHUB_ENV
-            echo "ARTIFACT_SUFFIX=feature" >> $GITHUB_ENV
-            echo "VERSION_CMD=" >> $GITHUB_ENV
-          fi
-          
-          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          echo "COMMIT_HASH=${{ github.sha }}" >> $GITHUB_ENV
-          echo "COMMIT_AUTHOR=${{ github.actor }}" >> $GITHUB_ENV
+          python3 update_version.py build-mirgame
+          MIRGAME_BUILD=$(awk -F '"' '/PROJECT_BUILD/ {print $2; exit}' scripting/include/version.inc)
+          echo "BUILD_NUMBER=$MIRGAME_BUILD" >> $GITHUB_ENV
+          echo "build_number=$MIRGAME_BUILD" >> $GITHUB_OUTPUT
+          echo "✅ Build number: $MIRGAME_BUILD"
 
-      - name: 🏗️ Update version information
+      - name: 🔍 Analyze build number
         run: |
-          if [ -n "$VERSION_CMD" ]; then
-            echo "🔧 Executing: $VERSION_CMD"
-            
-            if [[ "$VERSION_CMD" == *"&&"* ]]; then
-              IFS='&&' read -r cmd1 cmd2 <<< "$VERSION_CMD"
-              # Используем конструкцию для игнорирования ошибок выхода
-              if ! python3 update_version.py $(echo $cmd1 | xargs); then
-                echo "⚠️ First command completed with non-zero exit code, but continuing..."
-              fi
-              if ! python3 update_version.py $(echo $cmd2 | xargs); then
-                echo "⚠️ Second command completed with non-zero exit code, but continuing..."
-              fi
-            else
-              if ! python3 update_version.py $VERSION_CMD; then
-                echo "⚠️ Version update completed with non-zero exit code, but continuing..."
-              fi
-            fi
-          fi
-          
-          # Всегда обновляем build number и git info
-          python3 update_version.py build
-          
-          echo "📊 Final version information:"
-          python3 update_version.py info
+          echo "🔍 Build number analysis:"
+          python3 update_version.py decode-build
 
       - name: 🏗️ Compile all plugins
         run: |
@@ -165,7 +66,7 @@ jobs:
       - name: 📦 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: amxx-plugins-${{ env.ARTIFACT_SUFFIX }}-${{ github.run_number }}
+          name: amxx-plugins-${{ env.BUILD_NUMBER }}
           path: |
             compiled/*.amxx
             compile.log
@@ -176,17 +77,17 @@ jobs:
         run: |
           FULL_VERSION=$(python3 update_version.py get-full-version)
           BUILD_INFO=$(python3 update_version.py info)
-          COMPILE_RESULT=$(tail -10 compile.log | grep -E "✅|❌|⚠️" || echo "No compilation results found")
+          COMPILE_RESULT=$(tail -10 compile.log | grep -E "✅|❌|⚠️|Compilation summary:" || echo "No compilation results found")
           
           echo "## 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Build Information" >> $GITHUB_STEP_SUMMARY
           echo "- **Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** ${{ env.BRANCH_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version Strategy:** ${{ env.VERSION_STRATEGY }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Number:** ${{ env.BUILD_NUMBER }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** $FULL_VERSION" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact:** amxx-plugins-${{ env.ARTIFACT_SUFFIX }}-${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact:** amxx-plugins-${{ env.BUILD_NUMBER }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache Status:** ${{ steps.build-history-cache.outputs.cache-hit }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### 📋 Version Details" >> $GITHUB_STEP_SUMMARY
@@ -201,14 +102,23 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "Download the compiled plugins from the Artifacts section." >> $GITHUB_STEP_SUMMARY
-          
-          # Добавляем информацию о merge-детекции
-          if [[ "${{ env.BRANCH_NAME }}" == *"merge"* ]] || [[ "$GITHUB_REF" == *"merge"* ]]; then
-            echo "### 🔍 Merge Commit Handling" >> $GITHUB_STEP_SUMMARY
-            echo "✅ Successfully detected target branch for merge commit" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [View Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📢 Notify on success
+        if: success()
+        run: |
+          echo "🎉 Build completed successfully!"
+          echo "📦 Artifact: amxx-plugins-${{ env.BUILD_NUMBER }}"
+          echo "🔧 Build Number: ${{ env.BUILD_NUMBER }}"
+          echo "💾 Cache: ${{ steps.build-history-cache.outputs.cache-hit }}"
+
+      - name: 🚨 Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Build failed!"
+          echo "Please check the logs for errors."
+          echo "Cache status: ${{ steps.build-history-cache.outputs.cache-hit }}"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

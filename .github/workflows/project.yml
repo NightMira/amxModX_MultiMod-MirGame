@@ -1,83 +1,275 @@
+# Отключен, временно не работает
 name: Project Automation
 
 on:
-  issues:
-    types: [opened, reopened, closed]
-  pull_request:
-    types: [opened, reopened, closed, ready_for_review]
+#  issues:
+#    types: [opened, reopened, closed]
+#  pull_request:
+#    types: [opened, reopened, closed, ready_for_review]
   workflow_dispatch:
+    inputs:
+      sync_all:
+        description: 'Sync all open issues/PRs to project'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
   issues: write
   pull-requests: write
+  repository-projects: write
 
 jobs:
-  project-automation:
+  project_automation:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: 🚀 Checkout code (with private token)
-        uses: actions/checkout@v4
+      - name: Add new items to project
+        uses: actions/add-to-project@v1.0.2
         with:
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          project-url: https://github.com/users/NightMira/projects/3
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        if: |
+          github.event.action == 'opened' || 
+          github.event.action == 'reopened' || 
+          github.event.action == 'ready_for_review'
 
-      - name: 📋 Process project items
+      - name: Update status for closed items
+        if: github.event.action == 'closed'
         env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "## 🗂️ Project Automation Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔄 Processing closed item..." >> $GITHUB_STEP_SUMMARY
           
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            echo "### 📝 Issue Processing" >> $GITHUB_STEP_SUMMARY
-            echo "- **Issue:** #${{ github.event.issue.number }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Title:** ${{ github.event.issue.title }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Action:** ${{ github.event.action }}" >> $GITHUB_STEP_SUMMARY
+          # Получаем данные проекта
+          gh api graphql -f query='
+            query($user: String!, $number: Int!) {
+              user(login: $user) {
+                projectV2(number: $number) {
+                  id
+                  fields(first:20) {
+                    nodes {
+                      ... on ProjectV2Field {
+                        id
+                        name
+                        dataType
+                      }
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }' -f user="${{ github.repository_owner }}" -F number=3 > project_data.json
+          
+          PROJECT_ID=$(jq -r '.data.user.projectV2.id' project_data.json)
+          STATUS_FIELD_ID=$(jq -r '.data.user.projectV2.fields.nodes[] | select(.name=="Status" and .dataType=="SINGLE_SELECT") | .id' project_data.json)
+          DONE_OPTION_ID=$(jq -r '.data.user.projectV2.fields.nodes[] | select(.name=="Status" and .dataType=="SINGLE_SELECT") | .options[] | select(.name=="Done") | .id' project_data.json)
+          
+          if [ -n "$STATUS_FIELD_ID" ] && [ -n "$DONE_OPTION_ID" ]; then
+            if [ "${{ github.event_name }}" = "issues" ]; then
+              CONTENT_ID="${{ github.event.issue.node_id }}"
+            else
+              CONTENT_ID="${{ github.event.pull_request.node_id }}"
+            fi
+            
+            # Находим item в проекте
+            ITEM_ID=$(gh api graphql -f query='
+              query($project: ID!, $content: ID!) {
+                node(id: $project) {
+                  ... on ProjectV2 {
+                    items(first: 100) {
+                      nodes {
+                        id
+                        content {
+                          ... on Issue {
+                            id
+                          }
+                          ... on PullRequest {
+                            id
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' -f project="$PROJECT_ID" -f content="$CONTENT_ID" \
+              --jq ".data.node.items.nodes[] | select(.content.id == \"$CONTENT_ID\") | .id")
+            
+            if [ -n "$ITEM_ID" ]; then
+              gh api graphql -f query='
+                mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $project
+                    itemId: $item
+                    fieldId: $field
+                    value: {
+                      singleSelectOptionId: $value
+                    }
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }' -f project="$PROJECT_ID" -f item="$ITEM_ID" -f field="$STATUS_FIELD_ID" -f value="$DONE_OPTION_ID" --silent
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ Status updated to Done for item $ITEM_ID" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "❌ Failed to update status" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "⚠️ Item not found in project" >> $GITHUB_STEP_SUMMARY
+            fi
           else
-            echo "### 🔀 Pull Request Processing" >> $GITHUB_STEP_SUMMARY
-            echo "- **PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Title:** ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Action:** ${{ github.event.action }}" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Status field or Done option not found" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🎯 Target Project" >> $GITHUB_STEP_SUMMARY
-          echo "- **Project:** NightMira/Project#3" >> $GITHUB_STEP_SUMMARY
-          echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: 📋 Add new items to project
-        if: github.event_name == 'issues' && github.event.action == 'opened' || github.event_name == 'pull_request' && github.event.action == 'opened'
+      - name: Manual bulk sync
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.sync_all == 'true'
         env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🎯 Adding ${{ github.event_name }} to project..."
+          echo "### 🔍 Manual Bulk Sync" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Adding all open issues and PRs to project..." >> $GITHUB_STEP_SUMMARY
           
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            ITEM_URL="https://github.com/NightMira/amxModX_MultiMod-MirGame/issues/${{ github.event.issue.number }}"
-            echo "📝 Issue URL: $ITEM_URL"
-          else
-            ITEM_URL="https://github.com/NightMira/amxModX_MultiMod-MirGame/pull/${{ github.event.pull_request.number }}"
-            echo "📝 PR URL: $ITEM_URL"
+          # Проверяем доступ к приватному репозиторию
+          echo "🔐 Checking repository access..." >> $GITHUB_STEP_SUMMARY
+          gh api "repos/${{ github.repository }}" --jq '.name' >> $GITHUB_STEP_SUMMARY 2>&1 || echo "❌ Cannot access repository" >> $GITHUB_STEP_SUMMARY
+          
+          # Получаем PROJECT_ID
+          gh api graphql -f query='
+            query($user: String!, $number: Int!) {
+              user(login: $user) {
+                projectV2(number: $number) {
+                  id
+                  title
+                }
+              }
+            }' -f user="${{ github.repository_owner }}" -F number=3 > project_data.json
+          
+          PROJECT_ID=$(jq -r '.data.user.projectV2.id' project_data.json)
+          PROJECT_TITLE=$(jq -r '.data.user.projectV2.title' project_data.json)
+          
+          echo "🎯 Working with project: $PROJECT_TITLE" >> $GITHUB_STEP_SUMMARY
+          
+          # Функция для добавления в проект
+          add_to_project() {
+            local content_id="$1"
+            local item_type="$2"
+            local number="$3"
+            local title="$4"
+            
+            result=$(gh api graphql -f query='
+              mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: {
+                  projectId: $projectId,
+                  contentId: $contentId
+                }) {
+                  item {
+                    id
+                  }
+                }
+              }' -f projectId="$PROJECT_ID" -f contentId="$content_id" --silent 2>&1)
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
+              return 0
+            else
+              if echo "$result" | grep -q "already exists"; then
+                echo "ℹ️  $item_type #$number already in project: $title" >> $GITHUB_STEP_SUMMARY
+                return 0
+              elif echo "$result" | grep -q "Resource not accessible by integration"; then
+                echo "🔐 $item_type #$number: Token lacks permissions" >> $GITHUB_STEP_SUMMARY
+                return 1
+              else
+                echo "⚠️ Failed to add $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
+                echo "   Error: $result" >> $GITHUB_STEP_SUMMARY
+                return 1
+              fi
+            fi
+          }
+          
+          # Получаем issues из приватного репозитория
+          echo "🔍 Processing issues..." >> $GITHUB_STEP_SUMMARY
+          gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                issues(first: 100, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes {
+                    number
+                    id
+                    title
+                    state
+                  }
+                }
+              }
+            }' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" > issues.json
+          
+          # Проверяем, что получили данные
+          if [ $? -ne 0 ]; then
+            echo "❌ Failed to fetch issues from private repository" >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
           
-          # Добавляем в проект организации NightMira
-          if gh project item-add 3 --owner NightMira --url "$ITEM_URL"; then
-            echo "✅ Added to project successfully!"
-            echo "### ✅ Successfully Added to Project" >> $GITHUB_STEP_SUMMARY
-            echo "Item was successfully added to the project." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Failed to add to project."
-            echo "### ⚠️ Failed to Add to Project" >> $GITHUB_STEP_SUMMARY
-            echo "There was an issue adding the item to the project." >> $GITHUB_STEP_SUMMARY
+          added_count=0
+          while IFS= read -r issue; do
+            if [ -n "$issue" ]; then
+              number=$(echo "$issue" | jq -r '.number')
+              id=$(echo "$issue" | jq -r '.id')
+              title=$(echo "$issue" | jq -r '.title' | head -c 80)
+              state=$(echo "$issue" | jq -r '.state')
+              
+              if [ "$state" = "OPEN" ]; then
+                if add_to_project "$id" "Issue" "$number" "$title"; then
+                  added_count=$((added_count + 1))
+                fi
+              fi
+            fi
+          done < <(jq -c '.data.repository.issues.nodes[]' issues.json)
+          
+          # Получаем PRs из приватного репозитория
+          echo "🔍 Processing PRs..." >> $GITHUB_STEP_SUMMARY
+          gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                pullRequests(first: 100, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes {
+                    number
+                    id
+                    title
+                    state
+                  }
+                }
+              }
+            }' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" > prs.json
+          
+          # Проверяем, что получили данные
+          if [ $? -ne 0 ]; then
+            echo "❌ Failed to fetch PRs from private repository" >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
-
-      - name: 📋 Final summary
-        run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 Workflow Information" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Timestamp:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "*Automatically processed by GitHub Actions*" >> $GITHUB_STEP_SUMMARY
+          
+          while IFS= read -r pr; do
+            if [ -n "$pr" ]; then
+              number=$(echo "$pr" | jq -r '.number')
+              id=$(echo "$pr" | jq -r '.id')
+              title=$(echo "$pr" | jq -r '.title' | head -c 80)
+              state=$(echo "$pr" | jq -r '.state')
+              
+              if [ "$state" = "OPEN" ]; then
+                if add_to_project "$id" "PR" "$number" "$title"; then
+                  added_count=$((added_count + 1))
+                fi
+              fi
+            fi
+          done < <(jq -c '.data.repository.pullRequests.nodes[]' prs.json)
+          
+          echo "🎯 Manual sync completed! Added $added_count items to project." >> $GITHUB_STEP_SUMMARY
