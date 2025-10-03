@@ -13,6 +13,12 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  projects: write
+
 jobs:
   project_automation:
     runs-on: ubuntu-latest
@@ -22,7 +28,7 @@ jobs:
         uses: actions/add-to-project@v1.0.2
         with:
           project-url: https://github.com/users/NightMira/projects/3
-          github-token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
         if: |
           github.event.action == 'opened' || 
           github.event.action == 'reopened' || 
@@ -31,11 +37,11 @@ jobs:
       - name: Update status for closed items
         if: github.event.action == 'closed'
         env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🔄 Processing closed item..." >> $GITHUB_STEP_SUMMARY
           
-          # Получаем данные проекта с правильными типами
+          # Получаем данные проекта
           gh api graphql -f query='
             query($user: String!, $number: Int!) {
               user(login: $user) {
@@ -60,14 +66,13 @@ jobs:
                   }
                 }
               }
-            }' -f user="NightMira" -F number=3 > project_data.json
+            }' -f user="${{ github.repository_owner }}" -F number=3 > project_data.json
           
           PROJECT_ID=$(jq -r '.data.user.projectV2.id' project_data.json)
           STATUS_FIELD_ID=$(jq -r '.data.user.projectV2.fields.nodes[] | select(.name=="Status" and .dataType=="SINGLE_SELECT") | .id' project_data.json)
           DONE_OPTION_ID=$(jq -r '.data.user.projectV2.fields.nodes[] | select(.name=="Status" and .dataType=="SINGLE_SELECT") | .options[] | select(.name=="Done") | .id' project_data.json)
           
           if [ -n "$STATUS_FIELD_ID" ] && [ -n "$DONE_OPTION_ID" ]; then
-            # Определяем content ID в зависимости от типа события
             if [ "${{ github.event_name }}" = "issues" ]; then
               CONTENT_ID="${{ github.event.issue.node_id }}"
             else
@@ -98,7 +103,6 @@ jobs:
               --jq ".data.node.items.nodes[] | select(.content.id == \"$CONTENT_ID\") | .id")
             
             if [ -n "$ITEM_ID" ]; then
-              # Обновляем статус используя правильную мутацию
               gh api graphql -f query='
                 mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
                   updateProjectV2ItemFieldValue(input: {
@@ -121,21 +125,23 @@ jobs:
                 echo "❌ Failed to update status" >> $GITHUB_STEP_SUMMARY
               fi
             else
-              echo "⚠️ Item not found in project for content $CONTENT_ID" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ Item not found in project" >> $GITHUB_STEP_SUMMARY
             fi
           else
             echo "⚠️ Status field or Done option not found" >> $GITHUB_STEP_SUMMARY
-            echo "Status Field ID: $STATUS_FIELD_ID" >> $GITHUB_STEP_SUMMARY
-            echo "Done Option ID: $DONE_OPTION_ID" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Manual bulk sync
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.sync_all == 'true'
         env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "### 🔍 Manual Bulk Sync" >> $GITHUB_STEP_SUMMARY
           echo "📦 Adding all open issues and PRs to project..." >> $GITHUB_STEP_SUMMARY
+          
+          # Проверяем доступ к приватному репозиторию
+          echo "🔐 Checking repository access..." >> $GITHUB_STEP_SUMMARY
+          gh api "repos/${{ github.repository }}" --jq '.name' >> $GITHUB_STEP_SUMMARY 2>&1 || echo "❌ Cannot access repository" >> $GITHUB_STEP_SUMMARY
           
           # Получаем PROJECT_ID
           gh api graphql -f query='
@@ -143,20 +149,23 @@ jobs:
               user(login: $user) {
                 projectV2(number: $number) {
                   id
+                  title
                 }
               }
-            }' -f user="NightMira" -F number=3 > project_data.json
+            }' -f user="${{ github.repository_owner }}" -F number=3 > project_data.json
           
           PROJECT_ID=$(jq -r '.data.user.projectV2.id' project_data.json)
+          PROJECT_TITLE=$(jq -r '.data.user.projectV2.title' project_data.json)
           
-          # Функция для добавления в проект с правильными типами
+          echo "🎯 Working with project: $PROJECT_TITLE" >> $GITHUB_STEP_SUMMARY
+          
+          # Функция для добавления в проект
           add_to_project() {
             local content_id="$1"
             local item_type="$2"
             local number="$3"
             local title="$4"
             
-            # Используем правильную мутацию addProjectV2ItemById с полем 'item'
             result=$(gh api graphql -f query='
               mutation($projectId: ID!, $contentId: ID!) {
                 addProjectV2ItemById(input: {
@@ -173,19 +182,21 @@ jobs:
               echo "✅ $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
               return 0
             else
-              # Если элемент уже существует, это нормально
               if echo "$result" | grep -q "already exists"; then
                 echo "ℹ️  $item_type #$number already in project: $title" >> $GITHUB_STEP_SUMMARY
                 return 0
+              elif echo "$result" | grep -q "Resource not accessible by integration"; then
+                echo "🔐 $item_type #$number: Token lacks permissions" >> $GITHUB_STEP_SUMMARY
+                return 1
               else
                 echo "⚠️ Failed to add $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
-                echo "Error: $result" >> $GITHUB_STEP_SUMMARY
+                echo "   Error: $result" >> $GITHUB_STEP_SUMMARY
                 return 1
               fi
             fi
           }
           
-          # Получаем issues через GraphQL API с правильными типами
+          # Получаем issues из приватного репозитория
           echo "🔍 Processing issues..." >> $GITHUB_STEP_SUMMARY
           gh api graphql -f query='
             query($owner: String!, $repo: String!) {
@@ -200,6 +211,12 @@ jobs:
                 }
               }
             }' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" > issues.json
+          
+          # Проверяем, что получили данные
+          if [ $? -ne 0 ]; then
+            echo "❌ Failed to fetch issues from private repository" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
           
           added_count=0
           while IFS= read -r issue; do
@@ -217,7 +234,7 @@ jobs:
             fi
           done < <(jq -c '.data.repository.issues.nodes[]' issues.json)
           
-          # Получаем PRs через GraphQL API с правильными типами
+          # Получаем PRs из приватного репозитория
           echo "🔍 Processing PRs..." >> $GITHUB_STEP_SUMMARY
           gh api graphql -f query='
             query($owner: String!, $repo: String!) {
@@ -232,6 +249,12 @@ jobs:
                 }
               }
             }' -f owner="${{ github.repository_owner }}" -f repo="${{ github.event.repository.name }}" > prs.json
+          
+          # Проверяем, что получили данные
+          if [ $? -ne 0 ]; then
+            echo "❌ Failed to fetch PRs from private repository" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
           
           while IFS= read -r pr; do
             if [ -n "$pr" ]; then
