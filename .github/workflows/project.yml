@@ -60,8 +60,8 @@ jobs:
           # Поля для статуса
           STATUS_FIELD_ID=$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .id' project_data.json)
           if [ "$STATUS_FIELD_ID" != "null" ] && [ -n "$STATUS_FIELD_ID" ]; then
-            echo "STATUS_FIELD_ID='$STATUS_FIELD_ID" >> $GITHUB_ENV
-            echo "TODO_OPTION_ID='$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") | .id' project_data.json)" >> $GITHUB_ENV
+            echo "STATUS_FIELD_ID=$STATUS_FIELD_ID" >> $GITHUB_ENV
+            echo "TODO_OPTION_ID=$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Todo") | .id' project_data.json)" >> $GITHUB_ENV
             echo "DONE_OPTION_ID=$(jq '.data.user.projectV2.fields.nodes[] | select(.name== "Status") | .options[] | select(.name=="Done") | .id' project_data.json)" >> $GITHUB_ENV
           fi
 
