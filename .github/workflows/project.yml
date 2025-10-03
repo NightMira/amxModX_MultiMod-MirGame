@@ -193,18 +193,91 @@ jobs:
           echo "### 🔍 Manual Sync" >> $GITHUB_STEP_SUMMARY
           echo "📦 Syncing all open items..." >> $GITHUB_STEP_SUMMARY
           
-          # Синхронизация issues (простой способ через gh cli)
-          gh issue list --state open --json number,title,url | jq -c '.[]' | while read item; do
-            number=$(echo "$item" | jq -r '.number')
-            url=$(echo "$item" | jq -r '.url')
-            gh project item-add 3 --owner NightMira --url "$url" 2>/dev/null && echo "✅ Issue #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ Issue #$number" >> $GITHUB_STEP_SUMMARY
+          # Функция для добавления элемента в проект через GraphQL API
+          add_to_project() {
+            local content_id="$1"
+            local item_type="$2"
+            local number="$3"
+            
+            item_id=$(gh api graphql -f query='
+              mutation($project:ID!, $content:ID!) {
+                addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
+                  item {
+                    id
+                  }
+                }
+              }' -f project="$PROJECT_ID" -f content="$content_id" --jq '.data.addProjectV2ItemById.item.id' 2>/dev/null)
+            
+            if [ -n "$item_id" ] && [ "$item_id" != "null" ]; then
+              echo "✅ $item_type #$number added to project" >> $GITHUB_STEP_SUMMARY
+              
+              # Устанавливаем статус "Todo" для новых элементов
+              if [ -n "$STATUS_FIELD_ID" ] && [ -n "$TODO_OPTION_ID" ]; then
+                gh api graphql -f query='
+                  mutation($project: ID!, $item: ID!, $field: ID!, $value: String!) {
+                    updateProjectV2ItemFieldValue(input: {
+                      projectId: $project
+                      itemId: $item
+                      fieldId: $field
+                      value: {
+                        singleSelectOptionId: $value
+                      }
+                    }) {
+                      projectV2Item {
+                        id
+                      }
+                    }
+                  }' -f project="$PROJECT_ID" -f item="$item_id" -f field="$STATUS_FIELD_ID" -f value="$TODO_OPTION_ID" --silent 2>/dev/null
+              fi
+            else
+              echo "⚠️ $item_type #$number already in project or failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          }
+          
+          # Синхронизация issues через GraphQL API
+          echo "🔍 Fetching open issues..." >> $GITHUB_STEP_SUMMARY
+          gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                issues(first: 50, states: OPEN) {
+                  nodes {
+                    number
+                    id
+                    title
+                  }
+                }
+              }
+            }' -f owner="$USER" -f repo="${{ github.event.repository.name }}" > issues.json
+          
+          jq -c '.data.repository.issues.nodes[]' issues.json | while read -r issue; do
+            number=$(echo "$issue" | jq -r '.number')
+            id=$(echo "$issue" | jq -r '.id')
+            title=$(echo "$issue" | jq -r '.title')
+            
+            add_to_project "$id" "Issue" "$number"
           done
           
-          # Синхронизация PR
-          gh pr list --state open --json number,title,url | jq -c '.[]' | while read item; do
-            number=$(echo "$item" | jq -r '.number')
-            url=$(echo "$item" | jq -r '.url')
-            gh project item-add 3 --owner NightMira --url "$url" 2>/dev/null && echo "✅ PR #$number" >> $GITHUB_STEP_SUMMARY || echo "⚠️ PR #$number" >> $GITHUB_STEP_SUMMARY
+          # Синхронизация PR через GraphQL API
+          echo "🔍 Fetching open PRs..." >> $GITHUB_STEP_SUMMARY
+          gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                pullRequests(first: 50, states: OPEN) {
+                  nodes {
+                    number
+                    id
+                    title
+                  }
+                }
+              }
+            }' -f owner="$USER" -f repo="${{ github.event.repository.name }}" > prs.json
+          
+          jq -c '.data.repository.pullRequests.nodes[]' prs.json | while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            id=$(echo "$pr" | jq -r '.id')
+            title=$(echo "$pr" | jq -r '.title')
+            
+            add_to_project "$id" "PR" "$number"
           done
           
           echo "✅ Manual sync completed!" >> $GITHUB_STEP_SUMMARY
