@@ -28,18 +28,18 @@
 
 // MirGame Build System Information - ❌ Генерируется автоматически в CI
 // Эти поля будут перезаписаны при сборке в GitHub Actions
-#define PROJECT_BUILD               "TEMPLATE"      // Автоматически: 00D0002d
-#define PROJECT_BUILD_NUM           0               // Автоматически: 2
-#define PROJECT_BUILD_TYPE          "local"         // Автоматически: ci/developer/release
-#define PROJECT_BRANCH_CODE         "U"             // Автоматически: R/D/F/H/A/B/C/X
-#define PROJECT_BUILD_SUFFIX        "x"             // Автоматически: c/d/r/i/b
-#define PROJECT_BUILD_DATE          "2025-09-29"
+#define PROJECT_BUILD "00D0002l"      // Автоматически: 00D0002d
+#define PROJECT_BUILD_NUM 2               // Автоматически: 2
+#define PROJECT_BUILD_TYPE "local"         // Автоматически: ci/developer/release
+#define PROJECT_BRANCH_CODE "D"             // Автоматически: R/D/F/H/A/B/C/X
+#define PROJECT_BUILD_SUFFIX "l"             // Автоматически: c/d/r/i/b
+#define PROJECT_BUILD_DATE "2025-10-03"
 #define PROJECT_BUILD_TIME          __TIME__
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
 // Git Commit Information - ✅ Обновляется автоматически
-#define PROJECT_COMMIT_HASH "570684eca19076ef757c4add46262804aadb5d7a"
-#define PROJECT_COMMIT_SHORT_HASH "570684e"
+#define PROJECT_COMMIT_HASH "ed9948bed52ec86a264b78cc595ef4f8577bab1e"
+#define PROJECT_COMMIT_SHORT_HASH "ed9948b"
 #define PROJECT_COMMIT_AUTHOR "MirGame"
 #define PROJECT_COMMIT_DATE "2025-10-03"
 

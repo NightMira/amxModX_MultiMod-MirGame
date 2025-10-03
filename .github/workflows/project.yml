@@ -120,28 +120,118 @@ jobs:
           echo "### 🔍 Manual Bulk Sync" >> $GITHUB_STEP_SUMMARY
           echo "📦 Adding all open issues and PRs to project..." >> $GITHUB_STEP_SUMMARY
           
-          # Issues
-          gh issue list --state open --json number,url --jq '.[]' | while read -r item; do
-            number=$(echo "$item" | jq -r '.number')
-            url=$(echo "$item" | jq -r '.url')
+          # Получаем PROJECT_ID (аналогично add-to-project action)
+          gh api graphql -f query='
+            query($user: String!, $number: Int!) {
+              user(login: $user) {
+                projectV2(number: $number) {
+                  id
+                }
+              }
+            }' -f user="NightMira" -F number=3 > project_data.json
+          
+          PROJECT_ID=$(jq -r '.data.user.projectV2.id' project_data.json)
+          
+          # Функция для добавления в проект (аналогично action)
+          add_to_project() {
+            local content_id="$1"
+            local item_type="$2"
+            local number="$3"
+            local title="$4"
             
-            if gh project item-add 3 --owner NightMira --url "$url" 2>/dev/null; then
-              echo "✅ Issue #$number" >> $GITHUB_STEP_SUMMARY
+            # Используем тот же подход что и в add-to-project
+            gh api graphql -f query='
+              mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: {
+                  projectId: $projectId,
+                  contentId: $contentId
+                }) {
+                  item {
+                    id
+                  }
+                }
+              }' -f projectId="$PROJECT_ID" -f contentId="$content_id" --silent 2>/dev/null
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
+              return 0
             else
-              echo "⚠️ Issue #$number" >> $GITHUB_STEP_SUMMARY
+              # Если не удалось добавить напрямую, пробуем как draft issue
+              gh api graphql -f query='
+                mutation($projectId: ID!, $title: String!) {
+                  addProjectV2DraftIssue(input: {
+                    projectId: $projectId,
+                    title: $title
+                  }) {
+                    projectItem {
+                      id
+                    }
+                  }
+                }' -f projectId="$PROJECT_ID" -f title="$title" --silent 2>/dev/null
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ $item_type #$number (as draft): $title" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "⚠️ $item_type #$number: $title" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          }
+          
+          # Получаем issues через GraphQL API
+          echo "🔍 Processing issues..." >> $GITHUB_STEP_SUMMARY
+          gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                issues(first: 100, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes {
+                    number
+                    id
+                    title
+                    url
+                  }
+                }
+              }
+            }' -f owner="NightMira" -f repo="${{ github.event.repository.name }}" > issues.json
+          
+          added_count=0
+          jq -c '.data.repository.issues.nodes[]' issues.json | while read -r issue; do
+            number=$(echo "$issue" | jq -r '.number')
+            id=$(echo "$issue" | jq -r '.id')
+            title=$(echo "$issue" | jq -r '.title | sub("^(.{80}).*$"; "$1...")')
+            url=$(echo "$issue" | jq -r '.url')
+            
+            add_to_project "$id" "Issue" "$number" "$title"
+            if [ $? -eq 0 ]; then
+              added_count=$((added_count + 1))
             fi
           done
           
-          # PRs
-          gh pr list --state open --json number,url --jq '.[]' | while read -r item; do
-            number=$(echo "$item" | jq -r '.number')
-            url=$(echo "$item" | jq -r '.url')
+          # Получаем PRs через GraphQL API
+          echo "🔍 Processing PRs..." >> $GITHUB_STEP_SUMMARY
+          gh api graphql -f query='
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                pullRequests(first: 100, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes {
+                    number
+                    id
+                    title
+                    url
+                  }
+                }
+              }
+            }' -f owner="NightMira" -f repo="${{ github.event.repository.name }}" > prs.json
+          
+          jq -c '.data.repository.pullRequests.nodes[]' prs.json | while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            id=$(echo "$pr" | jq -r '.id')
+            title=$(echo "$pr" | jq -r '.title | sub("^(.{80}).*$"; "$1...")')
+            url=$(echo "$pr" | jq -r '.url')
             
-            if gh project item-add 3 --owner NightMira --url "$url" 2>/dev/null; then
-              echo "✅ PR #$number" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "⚠️ PR #$number" >> $GITHUB_STEP_SUMMARY
+            add_to_project "$id" "PR" "$number" "$title"
+            if [ $? -eq 0 ]; then
+              added_count=$((added_count + 1))
             fi
           done
           
-          echo "🎯 Manual sync completed!" >> $GITHUB_STEP_SUMMARY
+          echo "🎯 Manual sync completed! Added $added_count items to project." >> $GITHUB_STEP_SUMMARY
