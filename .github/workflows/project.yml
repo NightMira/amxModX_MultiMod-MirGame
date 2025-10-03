@@ -1,10 +1,11 @@
+# Отключен, временно не работает
 name: Project Automation
 
 on:
-  issues:
-    types: [opened, reopened, closed]
-  pull_request:
-    types: [opened, reopened, closed, ready_for_review]
+#  issues:
+#    types: [opened, reopened, closed]
+#  pull_request:
+#    types: [opened, reopened, closed, ready_for_review]
   workflow_dispatch:
     inputs:
       sync_all:

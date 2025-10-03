@@ -23,13 +23,13 @@
 #define PROJECT_VERSION_NUM 6
 
 // Version Suffix (Pre-release tags) - ✅ В репозитории (управляется вручную)
-#define PROJECT_VERSION_TAG "SNAPSHOT"
-#define PROJECT_VERSION_SUFFIX "-SNAPSHOT"
+#define PROJECT_VERSION_TAG ""
+#define PROJECT_VERSION_SUFFIX ""
 
 // MirGame Build System Information - ❌ Генерируется автоматически в CI
 // Эти поля будут перезаписаны при сборке в GitHub Actions
-#define PROJECT_BUILD "00D0003l"      // Автоматически: 00D0002d
-#define PROJECT_BUILD_NUM 3               // Автоматически: 2
+#define PROJECT_BUILD "00D0004l"      // Автоматически: 00D0002d
+#define PROJECT_BUILD_NUM 4               // Автоматически: 2
 #define PROJECT_BUILD_TYPE "local"         // Автоматически: ci/developer/release
 #define PROJECT_BRANCH_CODE "D"             // Автоматически: R/D/F/H/A/B/C/X
 #define PROJECT_BUILD_SUFFIX "l"             // Автоматически: c/d/r/i/b
@@ -38,9 +38,9 @@
 #define PROJECT_BUILD_TIMESTAMP     __DATE__ " " __TIME__
 
 // Git Commit Information - ✅ Обновляется автоматически
-#define PROJECT_COMMIT_HASH "a951b65bde6e2421455c8a6222eea579ec1fadd3"
-#define PROJECT_COMMIT_SHORT_HASH "a951b65"
-#define PROJECT_COMMIT_AUTHOR "MirGame"
+#define PROJECT_COMMIT_HASH "2d4aa8655268ccfa949375dd393bb17f7d40659b"
+#define PROJECT_COMMIT_SHORT_HASH "2d4aa86"
+#define PROJECT_COMMIT_AUTHOR "NightMira"
 #define PROJECT_COMMIT_DATE "2025-10-03"
 
 /* ========================================================================== */
